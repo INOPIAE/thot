@@ -79,6 +79,10 @@ def seed_database():
             {
                 "name": "user",
                 "description": "Regular user with basic access"
+            },
+            {
+                "name": "user_reg",
+                "description": "User role during registration process"
             }
         ]
 
