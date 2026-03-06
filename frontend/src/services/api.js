@@ -25,11 +25,21 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Redirect to login on unauthorized
+    const status = error.response?.status
+    const requestUrl = error.config?.url || ''
+    const isAuthRequest = requestUrl.startsWith('/auth/login')
+      || requestUrl.startsWith('/auth/register')
+      || requestUrl.startsWith('/auth/password-reset')
+    const hasToken = Boolean(localStorage.getItem('access_token'))
+
+    // Only force logout for authenticated API calls, not during login/register flows.
+    if (status === 401 && hasToken && !isAuthRequest) {
       localStorage.removeItem('access_token')
-      window.location.href = '/login'
+      if (window.location.pathname !== '/auth/login') {
+        window.location.href = '/auth/login'
+      }
     }
+
     return Promise.reject(error)
   }
 )

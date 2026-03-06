@@ -103,6 +103,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/records/:recordId/pages/:pageId/viewer',
+    name: 'PageViewer',
+    component: () => import('@/views/records/PageViewer.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/records/:recordId/pages/:pageId/edit',
     name: 'PageEdit',
     component: () => import('@/views/records/PageForm.vue'),

@@ -4,6 +4,12 @@
       <h1>{{ $t('pages.pageDetail') }}</h1>
       <div class="header-actions">
         <router-link
+          :to="`/records/${recordId}/pages/${pageId}/viewer`"
+          class="btn btn-secondary"
+        >
+          {{ $t('pages.openPdfViewer') }}
+        </router-link>
+        <router-link
           :to="`/records/${recordId}/pages/${pageId}/edit`"
           class="btn btn-primary"
         >

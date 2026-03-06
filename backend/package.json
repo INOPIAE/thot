@@ -4,9 +4,9 @@
   "description": "RESTful API for NLF Database Management with Python FastAPI and PostgreSQL",
   "main": "app/main.py",
   "scripts": {
-    "dev": "uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
-    "prod": "uvicorn app.main:app --host 0.0.0.0 --port 8000",
-    "test": "pytest tests/ -v --cov=app",
+    "dev": ".\\venv\\Scripts\\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "prod": ".\\venv\\Scripts\\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000",
+    "test": ".\\venv\\Scripts\\python.exe -m pytest tests/ -v --cov=app",
     "test-watch": "pytest tests/ -v --cov=app --watch",
     "lint": "flake8 app tests",
     "format": "black app tests",

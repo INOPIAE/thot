@@ -29,6 +29,9 @@ app.use(i18n)
 
 // Initialize app configuration from backend
 const appStore = useAppStore()
-await appStore.initializeConfig()
-
 app.mount('#app')
+
+// Load config in background so UI is visible even if backend is unavailable.
+appStore.initializeConfig().catch((error) => {
+  console.error('Background config initialization failed:', error)
+})

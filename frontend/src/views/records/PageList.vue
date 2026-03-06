@@ -74,6 +74,9 @@
               <router-link :to="`/records/${recordId}/pages/${page.id}`" class="btn btn-sm btn-info">
                 {{ $t('pages.openOverview') }}
               </router-link>
+              <router-link :to="`/records/${recordId}/pages/${page.id}/viewer`" class="btn btn-sm btn-primary">
+                {{ $t('pages.openPdfViewer') }}
+              </router-link>
               <router-link :to="`/records/${recordId}/pages/${page.id}/edit`" class="btn btn-sm btn-secondary">
                 {{ $t('common.edit') }}
               </router-link>
