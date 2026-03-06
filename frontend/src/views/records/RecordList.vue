@@ -37,6 +37,32 @@
         </div>
 
         <div class="form-group">
+          <label for="search-keywords-names">{{ $t('records.searchByKeywordsNames') }}</label>
+          <input
+            id="search-keywords-names"
+            v-model="searchKeywordsNames"
+            type="text"
+            class="form-control"
+            :placeholder="$t('records.keywordsNamesSearchPlaceholder')"
+            @input="handleSearch"
+          />
+          <small class="form-text">{{ $t('records.keywordsSearchHelp') }}</small>
+        </div>
+
+        <div class="form-group">
+          <label for="search-keywords-locations">{{ $t('records.searchByKeywordsLocations') }}</label>
+          <input
+            id="search-keywords-locations"
+            v-model="searchKeywordsLocations"
+            type="text"
+            class="form-control"
+            :placeholder="$t('records.keywordsLocationsSearchPlaceholder')"
+            @input="handleSearch"
+          />
+          <small class="form-text">{{ $t('records.keywordsSearchHelp') }}</small>
+        </div>
+
+        <div class="form-group">
           <label for="page-size">{{ $t('records.pageSize') }}</label>
           <select
             id="page-size"
@@ -78,6 +104,8 @@
           <tr>
             <th>{{ $t('records.title') }}</th>
             <th>{{ $t('records.signature') }}</th>
+            <th>{{ $t('records.keywordsNames') }}</th>
+            <th>{{ $t('records.keywordsLocations') }}</th>
             <th>{{ $t('records.restriction') }}</th>
             <th>{{ $t('records.workstatus') }}</th>
             <th>{{ $t('records.createdOn') }}</th>
@@ -88,6 +116,18 @@
           <tr v-for="record in records" :key="record.id">
             <td>{{ record.title }}</td>
             <td>{{ record.signature || '-' }}</td>
+            <td class="keywords-cell">
+              <span v-if="record.keywords_names" class="keywords-tag">
+                {{ record.keywords_names }}
+              </span>
+              <span v-else>-</span>
+            </td>
+            <td class="keywords-cell">
+              <span v-if="record.keywords_locations" class="keywords-tag">
+                {{ record.keywords_locations }}
+              </span>
+              <span v-else>-</span>
+            </td>
             <td>{{ record.restriction || '-' }}</td>
             <td>{{ record.workstatus || '-' }}</td>
             <td>{{ formatDate(record.created_on) }}</td>
@@ -148,6 +188,8 @@ export default defineComponent({
       successMessage: null,
       searchTitle: '',
       searchSignature: '',
+      searchKeywordsNames: '',
+      searchKeywordsLocations: '',
       currentPage: 0,
       pageSize: 10,
       totalRecords: 0,
@@ -181,6 +223,14 @@ export default defineComponent({
           params.signature = this.searchSignature
         }
 
+        if (this.searchKeywordsNames) {
+          params.keywords_names = this.searchKeywordsNames
+        }
+
+        if (this.searchKeywordsLocations) {
+          params.keywords_locations = this.searchKeywordsLocations
+        }
+
         const response = await recordService.listRecords(params)
 
         this.records = response.items || []
@@ -206,6 +256,8 @@ export default defineComponent({
     resetFilters() {
       this.searchTitle = ''
       this.searchSignature = ''
+      this.searchKeywordsNames = ''
+      this.searchKeywordsLocations = ''
       this.currentPage = 0
       this.loadRecords()
     },
@@ -301,6 +353,14 @@ export default defineComponent({
   font-size: 14px;
 }
 
+.form-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
+}
+
 .form-control {
   padding: 8px 12px;
   border: 1px solid #ddd;
@@ -370,6 +430,20 @@ export default defineComponent({
 
 .records-table tbody tr:hover {
   background-color: #f5f5f5;
+}
+
+.keywords-cell {
+  max-width: 200px;
+}
+
+.keywords-tag {
+  display: inline-block;
+  font-size: 12px;
+  color: #495057;
+  background-color: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 3px;
+  word-break: break-word;
 }
 
 .actions-cell {
@@ -453,5 +527,35 @@ export default defineComponent({
   padding: 60px 20px;
   color: #999;
   font-size: 16px;
+}
+
+@media (max-width: 1200px) {
+  .records-table {
+    font-size: 13px;
+  }
+  
+  .records-table th,
+  .records-table td {
+    padding: 8px;
+  }
+  
+  .keywords-cell {
+    max-width: 150px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 768px) {
+  .search-fields {
+    grid-template-columns: 1fr;
+  }
+  
+  .records-table-container {
+    overflow-x: auto;
+  }
+  
+  .records-table {
+    min-width: 800px;
+  }
 }
 </style>

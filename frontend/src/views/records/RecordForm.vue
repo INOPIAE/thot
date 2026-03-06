@@ -69,6 +69,30 @@
         />
       </div>
 
+      <div class="form-group">
+        <label for="keywords_names">{{ $t('records.keywordsNames') }}</label>
+        <input
+          id="keywords_names"
+          v-model="form.keywords_names"
+          type="text"
+          class="form-control"
+          :placeholder="$t('records.keywordsNamesPlaceholder')"
+        />
+        <small class="form-text">{{ $t('records.keywordsHelp') }}</small>
+      </div>
+
+      <div class="form-group">
+        <label for="keywords_locations">{{ $t('records.keywordsLocations') }}</label>
+        <input
+          id="keywords_locations"
+          v-model="form.keywords_locations"
+          type="text"
+          class="form-control"
+          :placeholder="$t('records.keywordsLocationsPlaceholder')"
+        />
+        <small class="form-text">{{ $t('records.keywordsHelp') }}</small>
+      </div>
+
       <div class="form-row">
         <div class="form-group">
           <label for="restriction">{{ $t('records.restriction') }} <span class="required">*</span></label>
@@ -126,6 +150,8 @@ export default defineComponent({
         signature: '',
         description: '',
         comment: '',
+        keywords_names: '',
+        keywords_locations: '',
         restriction_id: '',
         workstatus_id: '',
       },
@@ -194,6 +220,8 @@ export default defineComponent({
           signature: record.signature || '',
           description: record.description || '',
           comment: record.comment || '',
+          keywords_names: record.keywords_names || '',
+          keywords_locations: record.keywords_locations || '',
           restriction_id: record.restriction_id || '',
           workstatus_id: record.workstatus_id || '',
         }
@@ -216,6 +244,8 @@ export default defineComponent({
           signature: this.form.signature || null,
           description: this.form.description || null,
           comment: this.form.comment || null,
+          keywords_names: this.form.keywords_names || '',
+          keywords_locations: this.form.keywords_locations || '',
           restriction_id: this.form.restriction_id,
           workstatus_id: this.form.workstatus_id,
         }
@@ -372,6 +402,14 @@ textarea.form-control {
 
 .btn-secondary:hover {
   background-color: #545b62;
+}
+
+.form-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6c757d;
+  font-style: italic;
 }
 
 @media (max-width: 768px) {
