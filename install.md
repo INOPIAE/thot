@@ -76,6 +76,41 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### 3.5. Install Poppler (Required for PDF Thumbnails)
+
+The application uses `pdf2image` for generating PDF thumbnails with watermarks, which requires Poppler to be installed on your system.
+
+**Windows:**
+1. Download Poppler for Windows from: https://github.com/oschwartz10612/poppler-windows/releases/
+2. Extract the ZIP file to a location (e.g., `C:\Program Files\poppler`)
+3. Add the `bin` folder to your PATH environment variable:
+   - Right-click "This PC" → Properties → Advanced system settings
+   - Click "Environment Variables"
+   - Under "System variables", find "Path" and click "Edit"
+   - Add new entry: `C:\Program Files\poppler\Library\bin`
+   - Click OK and restart your terminal
+
+**Alternative (using Chocolatey):**
+```bash
+choco install poppler
+```
+
+**macOS (using Homebrew):**
+```bash
+brew install poppler
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install poppler-utils
+```
+
+**Verify Installation:**
+```bash
+pdftoppm -h
+```
+If successful, you should see the help output for pdftoppm.
+
 ### 4. Configure Environment Variables
 
 Create `.env` file in `backend/` directory:
@@ -112,11 +147,39 @@ CORS_ORIGINS=http://localhost:3000
 UPLOAD_DIRECTORY=./uploads
 MAX_UPLOAD_SIZE=52428800
 
+# Watermark Configuration (optional)
+# Path to logo image to include in PDF watermarks
+# WATERMARK_IMAGE_PATH=./assets/logo.png
+
 # Logging
 LOG_LEVEL=INFO
 ```
 
-### 5. Initialize Database
+### 5. (Optional) Configure Watermark Logo
+
+If you want to include your company logo in PDF watermarks:
+
+1. **Create assets directory:**
+   ```bash
+   mkdir backend/assets
+   ```
+
+2. **Place your logo** (PNG recommended for transparency):
+   ```
+   backend/assets/logo.png
+   ```
+
+3. **Enable in `.env`:**
+   ```env
+   WATERMARK_IMAGE_PATH=./assets/logo.png
+   ```
+
+Logo specifications:
+- Recommended size: 100-200px width
+- Formats: PNG (with alpha), JPEG, GIF
+- Will be automatically scaled to fit header area
+
+### 6. Initialize Database
 
 ```bash
 python scripts/init_db.py
@@ -128,7 +191,7 @@ This will:
 - Create default restrictions (none, confidential, locked, privacy)
 - Create default work statuses (not yet, running, finished)
 
-### 5.5. Create Upload Directory
+### 7. Create Upload Directory
 
 The application stores uploaded PDF files in the filesystem. Create the upload directory:
 
@@ -149,7 +212,7 @@ uploads/
 
 > **Note:** Make sure the directory has appropriate permissions for the backend process to write files.
 
-### 5.6. Test Email Configuration
+### 8. Test Email Configuration
 
 Before running the application, test your SMTP configuration:
 
@@ -184,7 +247,7 @@ This script will:
 
 > **Note:** The `SMTP_FROM_EMAIL` must match your authenticated SMTP account email address.
 
-### 6. Run Development Server
+### 9. Run Development Server
 
 ```bash
 python -m app.main

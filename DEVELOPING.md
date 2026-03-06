@@ -24,6 +24,35 @@ copy .env.example .env
 # Edit .env with your local database credentials
 ```
 
+### 1.5. Install Poppler (Required for PDF Thumbnails)
+
+The application requires Poppler for generating PDF thumbnails with watermarks.
+
+**Windows:**
+```bash
+# Using Chocolatey:
+choco install poppler
+
+# Or download from:
+# https://github.com/oschwartz10612/poppler-windows/releases/
+# Extract and add bin folder to PATH
+```
+
+**macOS:**
+```bash
+brew install poppler
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+sudo apt-get install poppler-utils
+```
+
+**Verify installation:**
+```bash
+pdftoppm -h
+```
+
 ### 2. Setup Frontend
 
 ```bash
@@ -190,15 +219,168 @@ The `location_file` field in the database stores the relative path: `{record_id}
 
 #### Accessing Uploaded Files
 
-Files are served as static content:
+⚠️ **Security Note:** Direct access to uploaded files via `/uploads/` is deprecated for security reasons. Always use the watermarked endpoints for viewing and downloading PDFs.
+
+---
+
+### PDF Watermarking System
+
+The application automatically adds watermarks to all PDFs when viewed or downloaded. This ensures document security and traceability.
+
+#### Watermark Content
+
+Every watermarked PDF includes:
+
+1. **Diagonal Background**: Large "CONFIDENTIAL" text across the page
+2. **Header Badge** (top-left):
+   - Optional company logo (configurable via `WATERMARK_IMAGE_PATH`)
+   - "CONFIDENTIAL" label
+   - Username of the viewer
+   - Download timestamp (YYYY-MM-DD HH:MM)
+3. **Record Information** (top-right):
+   - Record name
+   - Record signature
+   - Page identifier
+
+#### API Endpoints for Watermarked Content
+
+**View PDF with Watermark (inline):**
 ```
-GET /uploads/{record_id}/{filename}
+GET /api/v1/pages/{page_id}/view-pdf
+Authorization: Bearer {token}
+```
+Returns: PDF with watermark for browser viewing
+
+**Download PDF with Watermark:**
+```
+GET /api/v1/pages/{page_id}/download-watermarked
+Authorization: Bearer {token}
+```
+Returns: PDF with watermark as file download
+
+**Get Thumbnail with Watermark:**
+```
+GET /api/v1/pages/{page_id}/thumbnail?width=200
+Authorization: Bearer {token}
+```
+Returns: JPEG thumbnail of first page with watermark
+
+Query Parameters:
+- `width`: Thumbnail width in pixels (default: 200, min: 50, max: 800)
+
+#### Frontend Usage
+
+```javascript
+// Import page service
+import { pageService } from '@/services/page'
+
+// Load PDF for viewing
+const pdfBlob = await pageService.getViewPdf(pageId)
+const pdfUrl = URL.createObjectURL(pdfBlob)
+
+// Load thumbnail
+const thumbnailBlob = await pageService.getThumbnail(pageId, 300)
+const thumbnailUrl = URL.createObjectURL(thumbnailBlob)
+
+// Remember to revoke URLs to prevent memory leaks
+URL.revokeObjectURL(pdfUrl)
+URL.revokeObjectURL(thumbnailUrl)
 ```
 
-Example:
+#### Complete Example: PageViewer Component
+
+```vue
+<template>
+  <div>
+    <!-- Thumbnail -->
+    <img :src="thumbnailUrl" alt="Thumbnail" />
+    
+    <!-- PDF Viewer -->
+    <iframe :src="pdfUrl" type="application/pdf"></iframe>
+  </div>
+</template>
+
+<script>
+import { pageService } from '@/services/page'
+
+export default {
+  data() {
+    return {
+      pdfUrl: null,
+      thumbnailUrl: null,
+    }
+  },
+  async mounted() {
+    // Load PDF and thumbnail
+    const pdfBlob = await pageService.getViewPdf(this.pageId)
+    this.pdfUrl = URL.createObjectURL(pdfBlob)
+    
+    const thumbBlob = await pageService.getThumbnail(this.pageId, 250)
+    this.thumbnailUrl = URL.createObjectURL(thumbBlob)
+  },
+  beforeUnmount() {
+    // Clean up blob URLs
+    if (this.pdfUrl) URL.revokeObjectURL(this.pdfUrl)
+    if (this.thumbnailUrl) URL.revokeObjectURL(this.thumbnailUrl)
+  },
+}
+</script>
 ```
-http://localhost:8000/uploads/123e4567-e89b-12d3-a456-426614174000/abc-def-123.pdf
+
+#### Watermark Configuration
+
+Configure watermark appearance in `backend/config.py`:
+
+```python
+# Optional watermark image (company logo)
+WATERMARK_IMAGE_PATH = os.getenv('WATERMARK_IMAGE_PATH', None)
+
+@staticmethod
+def get_watermark_image_path():
+    """Return Path object for watermark image or None."""
+    if config.WATERMARK_IMAGE_PATH:
+        path = Path(config.WATERMARK_IMAGE_PATH)
+        if path.exists() and path.is_file():
+            return path
+    return None
 ```
+
+Place your logo image at the configured path, e.g.:
+```
+backend/assets/logo.png
+```
+
+And set in `.env`:
+```env
+WATERMARK_IMAGE_PATH=./assets/logo.png
+```
+
+Supported formats: PNG, JPEG, GIF (PNG with transparency recommended)
+
+#### Backend Implementation
+
+The watermark service uses:
+- **ReportLab** - Generate PDF overlays with text and images
+- **PyPDF** - Merge watermark with original PDF
+- **pdf2image** + **Pillow** - Generate thumbnails from PDFs
+- **Poppler** - Convert PDF pages to images (system dependency)
+
+Key service methods in `backend/app/services/pdf_watermark_service.py`:
+- `create_watermarked_pdf()` - Add watermark to all pages
+- `create_thumbnail_with_watermark()` - Generate first-page thumbnail with overlay
+
+#### Security Considerations
+
+✅ **Benefits:**
+- Every viewed/downloaded PDF is user-specific
+- Audit trail: Username + timestamp on every document
+- No direct file access without authentication
+- Blob URLs prevent caching in browser
+
+⚠️ **Important:**
+- Watermarks are generated on-the-fly (performance consideration for large PDFs)
+- Consider caching watermarked versions for frequently accessed documents
+- Rate limiting recommended for public-facing instances
 
 ### Modifying Configuration
 
@@ -918,6 +1100,166 @@ print(f"Created user: {user.id}")
 
 ---
 
+## API Testing - Watermarked PDFs
+
+### Testing Watermark Endpoints
+
+Once you have pages with uploaded PDFs, you can test the watermark endpoints.
+
+#### 1. Get a Valid JWT Token
+
+```bash
+# Login to get access token
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
+
+# Response includes: {"access_token": "eyJ0eXAi..."}
+```
+
+#### 2. List Pages to Get Page ID
+
+```bash
+curl -X GET http://localhost:8000/api/v1/pages \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+# Response includes array of pages with IDs
+```
+
+#### 3. Test Thumbnail Endpoint
+
+```bash
+# Get thumbnail with watermark (200px width)
+curl -X GET "http://localhost:8000/api/v1/pages/{PAGE_ID}/thumbnail?width=200" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  --output thumbnail.jpg
+
+# Get larger thumbnail (400px width)
+curl -X GET "http://localhost:8000/api/v1/pages/{PAGE_ID}/thumbnail?width=400" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  --output thumbnail_large.jpg
+```
+
+#### 4. Test PDF View Endpoint
+
+```bash
+# Get PDF for viewing (inline)
+curl -X GET "http://localhost:8000/api/v1/pages/{PAGE_ID}/view-pdf" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  --output view.pdf
+
+# Open in browser (copy the URL with token)
+# http://localhost:8000/api/v1/pages/{PAGE_ID}/view-pdf
+```
+
+#### 5. Test PDF Download Endpoint
+
+```bash
+# Download watermarked PDF
+curl -X GET "http://localhost:8000/api/v1/pages/{PAGE_ID}/download-watermarked" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  --output watermarked_download.pdf
+```
+
+### Using httpie (Alternative)
+
+If you have [httpie](https://httpie.io/) installed:
+
+```bash
+# Login
+http POST :8000/api/v1/auth/login username=admin password=yourpass
+
+# Get thumbnail (httpie automatically saves token if configured)
+http GET :8000/api/v1/pages/{PAGE_ID}/thumbnail width==250 \
+  Authorization:"Bearer YOUR_TOKEN" > thumb.jpg
+
+# View PDF
+http GET :8000/api/v1/pages/{PAGE_ID}/view-pdf \
+  Authorization:"Bearer YOUR_TOKEN" > view.pdf
+```
+
+### Testing from Frontend
+
+Open the browser DevTools Network tab when viewing a page to see:
+
+```
+Request URL: http://localhost:8000/api/v1/pages/{id}/view-pdf
+Request Method: GET
+Status Code: 200 OK
+Content-Type: application/pdf
+
+Request Headers:
+  Authorization: Bearer eyJ0eXAiOi...
+  
+Response Headers:
+  Content-Disposition: inline; filename="document_watermarked.pdf"
+  Cache-Control: no-store, no-cache, must-revalidate
+```
+
+### Verifying Watermark Content
+
+Open any downloaded/viewed PDF and verify it contains:
+
+1. **Diagonal "CONFIDENTIAL"** text across pages
+2. **Header badge** with:
+   - Company logo (if configured)
+   - Username (from JWT token)
+   - Current timestamp
+3. **Record information** (top-right):
+   - Record name
+   - Record signature
+   - Page identifier
+
+### Performance Testing
+
+Test watermark generation speed:
+
+```python
+# backend/scripts/test_watermark_performance.py
+import time
+from pathlib import Path
+from datetime import datetime
+from app.services.pdf_watermark_service import (
+    create_watermarked_pdf,
+    create_thumbnail_with_watermark
+)
+
+pdf_path = Path("uploads/test-record/test.pdf")
+
+# Test PDF watermarking
+start = time.time()
+pdf_bytes = create_watermarked_pdf(
+    source_pdf=pdf_path,
+    username="testuser",
+    downloaded_at=datetime.now(),
+    record_name="Test Record",
+    record_signature="TEST-001",
+    page_text="Page 1"
+)
+print(f"PDF watermark: {time.time() - start:.2f}s ({len(pdf_bytes) / 1024:.1f} KB)")
+
+# Test thumbnail generation
+start = time.time()
+thumb_bytes = create_thumbnail_with_watermark(
+    source_pdf=pdf_path,
+    username="testuser",
+    downloaded_at=datetime.now(),
+    record_name="Test Record",
+    record_signature="TEST-001",
+    page_text="Page 1",
+    thumbnail_width=300
+)
+print(f"Thumbnail: {time.time() - start:.2f}s ({len(thumb_bytes) / 1024:.1f} KB)")
+```
+
+Expected performance (depends on PDF size/complexity):
+- **Small PDFs** (1-5 pages): 0.5-2 seconds
+- **Medium PDFs** (10-20 pages): 2-5 seconds
+- **Large PDFs** (50+ pages): 5-15 seconds
+- **Thumbnails**: 0.3-1 second (first page only)
+
+---
+
 ## Useful Resources
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
@@ -939,5 +1281,5 @@ print(f"Created user: {user.id}")
 
 ---
 
-**Last Updated:** March 1, 2026
+**Last Updated:** March 6, 2026
 

@@ -75,3 +75,5 @@ Thumbs.db
 .DS_Store
 /.Marcus
 /backend/uploads
+/backend/assets/watermark_logo.png
+/backend/assets/NLF_neu_logo_banner_-_neu.webp

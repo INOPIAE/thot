@@ -106,6 +106,52 @@ export const pageService = {
       throw error.response?.data || error
     }
   },
+
+  /**
+   * Download a user-specific watermarked PDF for a page.
+   */
+  async downloadWatermarkedPdf(pageId) {
+    try {
+      const response = await api.get(`/pages/${pageId}/download-watermarked`, {
+        responseType: 'blob',
+      })
+      return {
+        blob: response.data,
+        contentDisposition: response.headers['content-disposition'] || '',
+      }
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
+   * Get watermarked PDF for viewing (returns blob)
+   */
+  async getViewPdf(pageId) {
+    try {
+      const response = await api.get(`/pages/${pageId}/view-pdf`, {
+        responseType: 'blob',
+      })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
+   * Get thumbnail with watermark (returns blob)
+   */
+  async getThumbnail(pageId, width = 200) {
+    try {
+      const response = await api.get(`/pages/${pageId}/thumbnail`, {
+        params: { width },
+        responseType: 'blob',
+      })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
 }
 
 export default pageService

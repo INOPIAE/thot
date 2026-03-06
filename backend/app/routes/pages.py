@@ -7,7 +7,8 @@ from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
-from sqlalchemy.orm import Session
+from fastapi.responses import Response
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models.page import Page
@@ -84,6 +85,181 @@ def delete_uploaded_file(location_file: str) -> None:
         file_path = config.UPLOAD_DIRECTORY / location_file
         if file_path.exists():
             file_path.unlink()
+
+
+@router.get("/{page_id}/download-watermarked")
+async def download_watermarked_pdf(
+    page_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """Return a user-specific watermarked PDF for the given page."""
+    page = db.query(Page).options(joinedload(Page.record)).filter(Page.id == page_id, Page.active == True).first()
+
+    if not page:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found",
+        )
+
+    if not page.location_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No PDF file available for this page",
+        )
+
+    source_pdf_path = (config.UPLOAD_DIRECTORY / page.location_file).resolve()
+    if not source_pdf_path.exists() or not source_pdf_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Source PDF file not found on server",
+        )
+
+    try:
+        from app.services.pdf_watermark_service import create_watermarked_pdf
+
+        watermark_bytes = create_watermarked_pdf(
+            source_pdf=source_pdf_path,
+            username=current_user.username,
+            downloaded_at=datetime.now(),
+            record_name=page.record.title if page.record else None,
+            record_signature=page.record.signature if page.record else None,
+            page_text=page.page,
+            watermark_image_path=config.get_watermark_image_path(),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate watermarked PDF: {str(exc)}",
+        )
+
+    filename_stem = Path(page.location_file).stem
+    download_name = f"{filename_stem}_watermarked.pdf"
+
+    return Response(
+        content=watermark_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{download_name}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/{page_id}/view-pdf")
+async def view_watermarked_pdf(
+    page_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """Return a user-specific watermarked PDF for inline viewing in the browser."""
+    page = db.query(Page).options(joinedload(Page.record)).filter(Page.id == page_id, Page.active == True).first()
+
+    if not page:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found",
+        )
+
+    if not page.location_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No PDF file available for this page",
+        )
+
+    source_pdf_path = (config.UPLOAD_DIRECTORY / page.location_file).resolve()
+    if not source_pdf_path.exists() or not source_pdf_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Source PDF file not found on server",
+        )
+
+    try:
+        from app.services.pdf_watermark_service import create_watermarked_pdf
+
+        watermark_bytes = create_watermarked_pdf(
+            source_pdf=source_pdf_path,
+            username=current_user.username,
+            downloaded_at=datetime.now(),
+            record_name=page.record.title if page.record else None,
+            record_signature=page.record.signature if page.record else None,
+            page_text=page.page,
+            watermark_image_path=config.get_watermark_image_path(),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate watermarked PDF: {str(exc)}",
+        )
+
+    filename_stem = Path(page.location_file).stem
+    view_name = f"{filename_stem}_watermarked.pdf"
+
+    return Response(
+        content=watermark_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{view_name}"',
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+    )
+
+
+@router.get("/{page_id}/thumbnail")
+async def get_thumbnail_with_watermark(
+    page_id: str,
+    width: int = Query(200, ge=50, le=800, description="Thumbnail width in pixels"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """Return a thumbnail of the first page with watermark overlay."""
+    page = db.query(Page).options(joinedload(Page.record)).filter(Page.id == page_id, Page.active == True).first()
+
+    if not page:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page not found",
+        )
+
+    if not page.location_file:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No PDF file available for this page",
+        )
+
+    source_pdf_path = (config.UPLOAD_DIRECTORY / page.location_file).resolve()
+    if not source_pdf_path.exists() or not source_pdf_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Source PDF file not found on server",
+        )
+
+    try:
+        from app.services.pdf_watermark_service import create_thumbnail_with_watermark
+
+        thumbnail_bytes = create_thumbnail_with_watermark(
+            source_pdf=source_pdf_path,
+            username=current_user.username,
+            downloaded_at=datetime.now(),
+            record_name=page.record.title if page.record else None,
+            record_signature=page.record.signature if page.record else None,
+            page_text=page.page,
+            watermark_image_path=config.get_watermark_image_path(),
+            thumbnail_width=width,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate thumbnail with watermark: {str(exc)}",
+        )
+
+    return Response(
+        content=thumbnail_bytes,
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+    )
 
 
 @router.get("")

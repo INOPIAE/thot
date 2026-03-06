@@ -98,6 +98,19 @@ class Config:
     UPLOAD_DIRECTORY = Path(os.getenv("UPLOAD_DIRECTORY", str(_DEFAULT_UPLOAD_DIRECTORY))).resolve()
     MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", 50 * 1024 * 1024))  # 50MB default
     ALLOWED_FILE_EXTENSIONS = [".pdf"]
+    WATERMARK_IMAGE_PATH = os.getenv("WATERMARK_IMAGE_PATH", "")
+
+    @classmethod
+    def get_watermark_image_path(cls) -> Optional[Path]:
+        """Return configured watermark image path (or None when disabled)."""
+        value = (cls.WATERMARK_IMAGE_PATH or "").strip()
+        if not value:
+            return None
+
+        image_path = Path(value)
+        if not image_path.is_absolute():
+            image_path = (Path(__file__).parent / image_path).resolve()
+        return image_path
     
     @classmethod
     def ensure_upload_directory(cls):

@@ -19,6 +19,8 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 - ✅ Keyword Management for Names and Locations
 - ✅ Phonetic Search (Cologne Phonetic & Double Metaphone)
 - ✅ Pages Management with PDF Upload
+- ✅ **PDF Watermarking with User Information**
+- ✅ **Dynamic Thumbnail Generation with Watermarks**
 - ✅ File Upload to Filesystem
 - ✅ Restriction & WorkStatus Management
 - ✅ Full-text Search and Filtering
@@ -36,6 +38,7 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 - Python 3.9+
 - Node.js 16+
 - PostgreSQL 12+
+- **Poppler** (required for PDF thumbnail generation)
 - Visual Studio Code
 
 ## Quick Start
@@ -179,7 +182,10 @@ CREATE DATABASE nlf_db_test OWNER nlf_user;
 - `POST /api/v1/pages` - Create new page with PDF upload
 - `PUT /api/v1/pages/{id}` - Update page (with optional file upload)
 - `DELETE /api/v1/pages/{id}` - Delete page (soft delete)
-- `GET /uploads/{record_id}/{filename}` - Download uploaded PDF file
+- `GET /api/v1/pages/{id}/view-pdf` - **View PDF with user-specific watermark (inline)**
+- `GET /api/v1/pages/{id}/thumbnail?width=200` - **Get thumbnail with watermark**
+- `GET /api/v1/pages/{id}/download-watermarked` - **Download PDF with watermark**
+- `GET /uploads/{record_id}/{filename}` - **(Deprecated) Direct file access - use watermarked endpoints**
 
 ### Configuration
 - `GET /api/v1/config` - Get public application configuration
@@ -203,6 +209,9 @@ SMTP_PASSWORD=your-app-password
 # File Upload Configuration
 UPLOAD_DIRECTORY=./uploads
 MAX_UPLOAD_SIZE=52428800
+
+# Watermark Configuration (optional)
+WATERMARK_IMAGE_PATH=./assets/logo.png
 ```
 
 ### Frontend (.env.local)

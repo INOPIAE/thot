@@ -152,13 +152,13 @@
           <div class="pdf-viewer-section">
             <h3>{{ $t('pages.pdfDocument') }}</h3>
             <div class="pdf-viewer-controls">
-              <a
-                :href="pdfViewerUrl"
-                download
+              <button
+                type="button"
                 class="btn btn-sm btn-primary"
+                @click="downloadWatermarkedPdf"
               >
                 {{ $t('pages.downloadPdf') }}
-              </a>
+              </button>
               <a
                 :href="pdfViewerUrl"
                 target="_blank"
@@ -192,6 +192,8 @@ export default {
       page: null,
       loading: false,
       error: null,
+      pdfBlobUrl: null,
+      thumbnailBlobUrl: null,
     }
   },
   computed: {
@@ -201,29 +203,24 @@ export default {
     pageId() {
       return this.$route.params.pageId
     },
-    pdfUrl() {
-      if (!this.page || !this.page.location_file) {
-        return null
-      }
-      const appStore = useAppStore()
-      const backendUrl = appStore.getConfig('backendUrl', 'http://localhost:8000')
-      return `${backendUrl}/uploads/${this.page.location_file}`
-    },
     pdfThumbnailUrl() {
-      if (!this.pdfUrl) {
-        return null
-      }
-      return `${this.pdfUrl}#page=1&view=FitH&toolbar=0&navpanes=0&scrollbar=0`
+      return this.thumbnailBlobUrl
     },
     pdfViewerUrl() {
-      if (!this.pdfUrl) {
-        return null
-      }
-      return `${this.pdfUrl}#toolbar=1&navpanes=0&scrollbar=1`
+      return this.pdfBlobUrl
     },
   },
   mounted() {
     this.loadPage()
+  },
+  beforeUnmount() {
+    // Clean up blob URLs to avoid memory leaks
+    if (this.pdfBlobUrl) {
+      URL.revokeObjectURL(this.pdfBlobUrl)
+    }
+    if (this.thumbnailBlobUrl) {
+      URL.revokeObjectURL(this.thumbnailBlobUrl)
+    }
   },
   methods: {
     async loadPage() {
@@ -231,11 +228,43 @@ export default {
       this.error = null
       try {
         this.page = await pageService.getPage(this.pageId)
+        
+        // Load PDF and thumbnail with watermarks if file exists
+        if (this.page && this.page.location_file) {
+          await Promise.all([
+            this.loadPdfBlob(),
+            this.loadThumbnailBlob(),
+          ])
+        }
       } catch (err) {
         console.error('Error loading page:', err)
         this.error = err.message || this.$t('pages.loadError')
       } finally {
         this.loading = false
+      }
+    },
+    async loadPdfBlob() {
+      try {
+        const blob = await pageService.getViewPdf(this.pageId)
+        // Revoke old URL if exists
+        if (this.pdfBlobUrl) {
+          URL.revokeObjectURL(this.pdfBlobUrl)
+        }
+        this.pdfBlobUrl = URL.createObjectURL(blob)
+      } catch (err) {
+        console.error('Error loading PDF blob:', err)
+      }
+    },
+    async loadThumbnailBlob() {
+      try {
+        const blob = await pageService.getThumbnail(this.pageId, 300)
+        // Revoke old URL if exists
+        if (this.thumbnailBlobUrl) {
+          URL.revokeObjectURL(this.thumbnailBlobUrl)
+        }
+        this.thumbnailBlobUrl = URL.createObjectURL(blob)
+      } catch (err) {
+        console.error('Error loading thumbnail blob:', err)
       }
     },
     formatDate(dateString) {
@@ -248,6 +277,33 @@ export default {
         hour: '2-digit',
         minute: '2-digit',
       })
+    },
+    async downloadWatermarkedPdf() {
+      if (!this.page) return
+
+      try {
+        const { blob, contentDisposition } = await pageService.downloadWatermarkedPdf(this.pageId)
+        const fileName = this.extractFilename(contentDisposition)
+          || `${(this.page.name || 'page').replace(/\s+/g, '_')}_watermarked.pdf`
+
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error('Error downloading watermarked PDF:', err)
+        const fallbackMessage = this.$t('pages.loadError')
+        this.error = err?.detail || err?.message || fallbackMessage
+      }
+    },
+    extractFilename(contentDisposition) {
+      if (!contentDisposition) return null
+      const match = contentDisposition.match(/filename="?([^";]+)"?/i)
+      return match ? match[1] : null
     },
   },
 }
