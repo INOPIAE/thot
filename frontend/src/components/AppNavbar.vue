@@ -21,6 +21,15 @@
         </ul>
       </li>
 
+      <!-- Records Section (Authenticated) -->
+      <li v-if="authStore.isAuthenticated" class="nav-section">
+        <span class="nav-label">{{ t('nav.records') }}</span>
+        <ul>
+          <li><router-link to="/records" @click="closeMenu">{{ t('nav.recordList') }}</router-link></li>
+          <li><router-link to="/records/new" @click="closeMenu">{{ t('nav.createRecord') }}</router-link></li>
+        </ul>
+      </li>
+
       <!-- User Management Section (Authenticated) -->
       <li v-if="authStore.isAuthenticated" class="nav-section">
         <span class="nav-label">{{ t('nav.userManagement') }}</span>

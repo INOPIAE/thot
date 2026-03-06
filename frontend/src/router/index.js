@@ -67,6 +67,24 @@ const routes = [
     meta: { requiresAuth: true, requiresRole: ['admin', 'support'] },
   },
   {
+    path: '/records',
+    name: 'RecordList',
+    component: () => import('@/views/records/RecordList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/records/new',
+    name: 'RecordCreate',
+    component: () => import('@/views/records/RecordForm.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/records/:id',
+    name: 'RecordEdit',
+    component: () => import('@/views/records/RecordForm.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/api-docs',
     name: 'ApiDocs',
     component: () => import('@/views/ApiDocs.vue'),
