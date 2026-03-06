@@ -8,17 +8,14 @@ from sqlalchemy import and_, or_
 
 from app.database import get_db
 from app.models import Record, Restriction, WorkStatus, KeywordName, KeywordLocation
-from app.utils import decode_access_token
+from app.utils.auth import get_current_user
 from app.utils.phonetics import generate_phonetic_codes
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, List
 
 router = APIRouter(
     prefix="/records",
     tags=["records"],
 )
-
-security = HTTPBearer()
 
 
 def process_keywords(db: Session, keywords_string: str, keyword_model):
@@ -64,30 +61,6 @@ def process_keywords(db: Session, keywords_string: str, keyword_model):
             keywords.append(new_keyword)
     
     return keywords
-
-
-async def get_current_user(db: Session = Depends(get_db), credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Get current user from JWT token
-    """
-    token = credentials.credentials
-    user_id = decode_access_token(token)
-
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
-
-    from app.services import UserService
-    user = UserService.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-
-    return user
 
 
 @router.get("")

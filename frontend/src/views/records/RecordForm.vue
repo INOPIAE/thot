@@ -2,9 +2,14 @@
   <div class="record-form-container">
     <div class="form-header">
       <h1>{{ isEditMode ? $t('records.editRecord') : $t('records.createRecord') }}</h1>
-      <router-link to="/records" class="btn btn-secondary">
-        {{ $t('common.back') }}
-      </router-link>
+      <div class="header-actions">
+        <router-link v-if="isEditMode" :to="`/records/${recordId}/pages`" class="btn btn-info">
+          {{ $t('pages.managePages') }}
+        </router-link>
+        <router-link to="/records" class="btn btn-secondary">
+          {{ $t('common.back') }}
+        </router-link>
+      </div>
     </div>
 
     <!-- Loading State -->
@@ -281,6 +286,11 @@ export default defineComponent({
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .form-header h1 {

@@ -108,6 +108,98 @@ Returns public application configuration:
 }
 ```
 
+---
+
+## Records & Pages Management
+
+### Working with Records
+
+Records are the primary data entities. Each record can have:
+- Title, signature, description
+- Keywords for names (with phonetic search)
+- Keywords for locations (with phonetic search)
+- Multiple pages with PDF files
+- Access restrictions
+- Work status tracking
+
+#### Creating a Record
+
+```javascript
+// Frontend
+import { recordService } from '@/services/record'
+
+const newRecord = await recordService.createRecord({
+  title: 'Archive Document 001',
+  signature: 'ARC-2026-001',
+  description: 'Historical document from 1920',
+  keywords_names: 'Müller, Schmidt, Meyer',  // Comma-separated
+  keywords_locations: 'Berlin, München, Hamburg',
+  restriction_id: restrictionId,  // UUID
+  workstatus_id: workstatusId    // UUID
+})
+```
+
+#### Phonetic Search
+
+Keywords are automatically indexed with:
+- **Cologne Phonetic** (c_search) - German-optimized
+- **Double Metaphone** (dblmeta_1, dblmeta_2) - English-optimized
+
+This enables fuzzy search for names and locations.
+
+### Working with Pages
+
+Pages belong to records and can contain PDF files.
+
+#### Creating a Page with PDF Upload
+
+```javascript
+// Frontend
+import { pageService } from '@/services/page'
+
+const formData = {
+  name: 'Page 1',
+  description: 'First page of the document',
+  page: 'Transcribed text content',
+  comment: 'Needs review',
+  record_id: recordId,
+  restriction_id: restrictionId,
+  workstatus_id: workstatusId,
+  file: pdfFile  // File object from <input type="file">
+}
+
+const newPage = await pageService.createPage(formData)
+```
+
+#### File Upload Configuration
+
+Files are stored in the filesystem:
+```
+backend/uploads/
+  └── {record_id}/
+      └── {page_id}.pdf
+```
+
+Configuration in `.env`:
+```env
+UPLOAD_DIRECTORY=./uploads
+MAX_UPLOAD_SIZE=52428800  # 50MB in bytes
+```
+
+The `location_file` field in the database stores the relative path: `{record_id}/{page_id}.pdf`
+
+#### Accessing Uploaded Files
+
+Files are served as static content:
+```
+GET /uploads/{record_id}/{filename}
+```
+
+Example:
+```
+http://localhost:8000/uploads/123e4567-e89b-12d3-a456-426614174000/abc-def-123.pdf
+```
+
 ### Modifying Configuration
 
 1. **Edit** `backend/config.py`:
@@ -557,6 +649,115 @@ const messages = {
   }
 }
 ```
+
+---
+
+## API Endpoints Reference
+
+### Authentication & Users
+
+#### Authentication
+- `POST /api/v1/auth/register` - Register new user
+- `GET /api/v1/auth/register/confirm/{token}` - Confirm registration
+- `POST /api/v1/auth/login` - Login with username/password
+- `POST /api/v1/auth/password-reset` - Request password reset
+- `POST /api/v1/auth/password-reset/confirm/{token}` - Confirm password reset
+
+#### User Profile
+- `GET /api/v1/users/profile` - Get current user profile
+- `PUT /api/v1/users/profile` - Update profile (first name, last name, language)
+- `POST /api/v1/users/password-change` - Change password
+- `POST /api/v1/users/email-change` - Request email change
+- `POST /api/v1/users/email-change/confirm/{token}` - Confirm email change
+
+#### User Management (Admin/Support)
+- `GET /api/v1/users` - List all users (with pagination and filters)
+- `GET /api/v1/users/{user_id}` - Get user details
+- `PUT /api/v1/users/{user_id}` - Update user (support/admin)
+- `POST /api/v1/users/{user_id}/password-reset` - Trigger password reset
+- `PUT /api/v1/users/{user_id}/roles` - Update user roles
+
+### Records Management
+
+#### Records CRUD
+- `GET /api/v1/records` - List all records
+  - Query params: `title`, `signature`, `keywords_names`, `keywords_locations`, `skip`, `limit`
+- `GET /api/v1/records/{record_id}` - Get record details
+- `POST /api/v1/records` - Create new record
+  - Body: `title`, `signature`, `description`, `comment`, `keywords_names`, `keywords_locations`, `restriction_id`, `workstatus_id`
+- `PUT /api/v1/records/{record_id}` - Update record
+- `DELETE /api/v1/records/{record_id}` - Delete record (soft delete)
+
+#### Record Metadata
+- `GET /api/v1/records/restrictions` - Get all restrictions
+  - Returns: `none`, `confidential`, `locked`, `privacy`
+- `GET /api/v1/records/workstatus` - Get all work statuses
+  - Returns: `not yet`, `running`, `finished` (for area: record)
+
+#### Example: Create Record
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/records" \\
+  -H "Authorization: Bearer {token}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "title": "Archive Document 2026-001",
+    "signature": "ARC-2026-001",
+    "description": "Historical document from Berlin",
+    "keywords_names": "Müller, Schmidt",
+    "keywords_locations": "Berlin, München",
+    "restriction_id": "uuid-restriction-none",
+    "workstatus_id": "uuid-workstatus-not-yet"
+  }'
+```
+
+### Pages Management
+
+#### Pages CRUD
+- `GET /api/v1/pages` - List all pages
+  - Query params: `record_id`, `name`, `skip`, `limit`
+- `GET /api/v1/pages/{page_id}` - Get page details
+- `POST /api/v1/pages` - Create new page with file upload
+  - Content-Type: `multipart/form-data`
+  - Fields: `name`, `description`, `page`, `comment`, `record_id`, `restriction_id`, `workstatus_id`, `file`
+- `PUT /api/v1/pages/{page_id}` - Update page
+  - Fields: Same as POST, plus `delete_file` (boolean)
+- `DELETE /api/v1/pages/{page_id}` - Delete page (soft delete)
+
+#### File Access
+- `GET /uploads/{record_id}/{filename}` - Download uploaded PDF file
+
+#### Example: Create Page with PDF Upload
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/pages" \\
+  -H "Authorization: Bearer {token}" \\
+  -F "name=Page 1" \\
+  -F "description=First page of document" \\
+  -F "page=Transcribed text content" \\
+  -F "record_id=uuid-record-id" \\
+  -F "restriction_id=uuid-restriction-none" \\
+  -F "file=@document.pdf"
+```
+
+#### Example: Update Page (Replace PDF)
+
+```bash
+curl -X PUT "http://localhost:8000/api/v1/pages/{page_id}" \\
+  -H "Authorization: Bearer {token}" \\
+  -F "name=Updated Page 1" \\
+  -F "restriction_id=uuid-restriction-confidential" \\
+  -F "file=@new_document.pdf"
+```
+
+### Configuration
+- `GET /api/v1/config` - Get public application configuration
+
+### Role Management (Admin only)
+- `GET /api/v1/admin/roles` - List all roles
+- `POST /api/v1/admin/roles` - Create new role
+- `PUT /api/v1/admin/roles/{role_id}` - Update role
+- `DELETE /api/v1/admin/roles/{role_id}` - Delete role
 
 ---
 

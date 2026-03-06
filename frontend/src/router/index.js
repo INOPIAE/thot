@@ -85,6 +85,30 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/records/:recordId/pages',
+    name: 'PageList',
+    component: () => import('@/views/records/PageList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/records/:recordId/pages/new',
+    name: 'PageCreate',
+    component: () => import('@/views/records/PageForm.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/records/:recordId/pages/:pageId',
+    name: 'PageDetail',
+    component: () => import('@/views/records/PageDetail.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/records/:recordId/pages/:pageId/edit',
+    name: 'PageEdit',
+    component: () => import('@/views/records/PageForm.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/api-docs',
     name: 'ApiDocs',
     component: () => import('@/views/ApiDocs.vue'),

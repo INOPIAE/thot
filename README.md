@@ -4,6 +4,7 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 
 ## Features
 
+### Authentication & User Management
 - ✅ User Authentication with JWT tokens
 - ✅ Two-Factor Authentication (OTP)
 - ✅ Role-Based Access Control (RBAC)
@@ -12,6 +13,17 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 - ✅ Email Change with Verification
 - ✅ User Profile Management
 - ✅ Support Team User Management
+
+### Records & Data Management
+- ✅ Record Management (CRUD operations)
+- ✅ Keyword Management for Names and Locations
+- ✅ Phonetic Search (Cologne Phonetic & Double Metaphone)
+- ✅ Pages Management with PDF Upload
+- ✅ File Upload to Filesystem
+- ✅ Restriction & WorkStatus Management
+- ✅ Full-text Search and Filtering
+
+### Technical Features
 - ✅ Multi-language Support (English, German)
 - ✅ PostgreSQL Database with SQLAlchemy ORM
 - ✅ Alembic migrations support for schema changes
@@ -111,11 +123,27 @@ CREATE DATABASE nlf_db_test OWNER nlf_user;
 ```
 
 ### Models
+
+#### Authentication & Authorization
 - **User** - User accounts with authentication
 - **Role** - User roles (admin, support, user)
 - **Permission** - Granular permissions
 - **UserRole** - User-to-role mapping
 - **RolePermission** - Role-to-permission mapping
+- **UserRegistration** - Registration tokens
+- **PasswordResetToken** - Password reset tokens
+
+#### Records & Data
+- **Record** - Main data records with title, signature, description
+- **Page** - Pages within records with PDF file support
+- **KeywordName** - Keywords for names (with phonetic search)
+- **KeywordLocation** - Keywords for locations (with phonetic search)
+- **RecordsKeywordsName** - Record-to-name-keyword mapping
+- **RecordsKeywordsLocation** - Record-to-location-keyword mapping
+- **Restriction** - Access restrictions (none, confidential, locked, privacy)
+- **RestrictionDetail** - Detailed restriction information
+- **WorkStatus** - Workflow status tracking
+- **WorkStatusArea** - Status area categories (record, page)
 
 ## API Endpoints
 
@@ -123,6 +151,7 @@ CREATE DATABASE nlf_db_test OWNER nlf_user;
 - `POST /api/v1/auth/register` - Register new user
 - `POST /api/v1/auth/login` - Login user
 - `POST /api/v1/auth/password-reset` - Request password reset
+- `POST /api/v1/auth/password-reset/confirm/{token}` - Confirm password reset
 
 ### User Profile
 - `GET /api/v1/users/profile` - Get user profile
@@ -131,9 +160,29 @@ CREATE DATABASE nlf_db_test OWNER nlf_user;
 - `POST /api/v1/users/email-change` - Change email
 
 ### User Management (Admin/Support)
-- `GET /api/v1/users` - List users
+- `GET /api/v1/users` - List users (with filtering and pagination)
 - `GET /api/v1/users/{id}` - Get user details
 - `PUT /api/v1/users/{id}` - Update user
+
+### Records Management
+- `GET /api/v1/records` - List records (with search and pagination)
+- `GET /api/v1/records/{id}` - Get record details
+- `POST /api/v1/records` - Create new record
+- `PUT /api/v1/records/{id}` - Update record
+- `DELETE /api/v1/records/{id}` - Delete record (soft delete)
+- `GET /api/v1/records/restrictions` - Get available restrictions
+- `GET /api/v1/records/workstatus` - Get available work statuses
+
+### Pages Management
+- `GET /api/v1/pages` - List pages (filterable by record_id)
+- `GET /api/v1/pages/{id}` - Get page details
+- `POST /api/v1/pages` - Create new page with PDF upload
+- `PUT /api/v1/pages/{id}` - Update page (with optional file upload)
+- `DELETE /api/v1/pages/{id}` - Delete page (soft delete)
+- `GET /uploads/{record_id}/{filename}` - Download uploaded PDF file
+
+### Configuration
+- `GET /api/v1/config` - Get public application configuration
 
 ## Environment Variables
 
@@ -150,6 +199,10 @@ SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
+
+# File Upload Configuration
+UPLOAD_DIRECTORY=./uploads
+MAX_UPLOAD_SIZE=52428800
 ```
 
 ### Frontend (.env.local)

@@ -132,6 +132,9 @@
             <td>{{ record.workstatus || '-' }}</td>
             <td>{{ formatDate(record.created_on) }}</td>
             <td class="actions-cell">
+              <router-link :to="`/records/${record.id}/pages`" class="btn btn-sm btn-secondary">
+                {{ $t('pages.title') }}
+              </router-link>
               <router-link :to="`/records/${record.id}`" class="btn btn-sm btn-info">
                 {{ $t('common.edit') }}
               </router-link>

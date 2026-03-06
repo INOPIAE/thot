@@ -93,6 +93,17 @@ class Config:
     FEATURE_EMAIL_VERIFICATION_ENABLED = os.getenv("FEATURE_EMAIL_VERIFICATION_ENABLED", "true").lower() == "true"
     FEATURE_CORPORATE_APPROVALS_ENABLED = os.getenv("FEATURE_CORPORATE_APPROVALS_ENABLED", "true").lower() == "true"
 
+    # File Upload Configuration
+    _DEFAULT_UPLOAD_DIRECTORY = Path(__file__).parent / "uploads"
+    UPLOAD_DIRECTORY = Path(os.getenv("UPLOAD_DIRECTORY", str(_DEFAULT_UPLOAD_DIRECTORY))).resolve()
+    MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", 50 * 1024 * 1024))  # 50MB default
+    ALLOWED_FILE_EXTENSIONS = [".pdf"]
+    
+    @classmethod
+    def ensure_upload_directory(cls):
+        """Ensure upload directory exists"""
+        cls.UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

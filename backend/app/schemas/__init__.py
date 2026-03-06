@@ -278,6 +278,79 @@ class UserUpdateSupportRequest(BaseModel):
 
 
 # ========================
+# Page Schemas
+# ========================
+
+class PageBase(BaseModel):
+    """Base page schema"""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
+    page: Optional[str] = Field(None, description="Page text content")
+    comment: Optional[str] = Field(None)
+    record_id: UUID
+    restriction_id: UUID
+
+
+class PageCreate(BaseModel):
+    """Create page request (file uploaded separately)"""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
+    page: Optional[str] = Field(None, description="Page text content")
+    comment: Optional[str] = Field(None)
+    record_id: UUID
+    restriction_id: UUID
+
+
+class PageUpdate(BaseModel):
+    """Update page request"""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=500)
+    page: Optional[str] = Field(None, description="Page text content")
+    comment: Optional[str] = Field(None)
+    restriction_id: Optional[UUID] = None
+
+
+class PageResponse(PageBase):
+    """Page response schema"""
+
+    id: UUID
+    location_file: Optional[str]
+    location_thumbnail: Optional[str]
+    location_file_watermark: Optional[str]
+    workstatus_id: Optional[UUID]
+    active: bool
+    created_on: datetime
+    created_by: Optional[UUID]
+    last_modified_on: Optional[datetime]
+    last_modified_by: Optional[UUID]
+
+    class Config:
+        from_attributes = True
+
+
+class PageListResponse(BaseModel):
+    """Page list item for overview"""
+
+    id: UUID
+    name: str
+    description: Optional[str]
+    page: Optional[str]
+    comment: Optional[str]
+    restriction_id: UUID
+    created_on: datetime
+
+
+class PageListDetailResponse(PageListResponse):
+    """Detailed page list response"""
+
+    location_file: Optional[str]
+    active: bool
+
+
+# ========================
 # Generic Schemas
 # ========================
 
@@ -327,6 +400,12 @@ __all__ = [
     "UserListResponse",
     "UserDetailSupportResponse",
     "UserUpdateSupportRequest",
+    "PageBase",
+    "PageCreate",
+    "PageUpdate",
+    "PageResponse",
+    "PageListResponse",
+    "PageListDetailResponse",
     "PaginatedResponse",
     "ErrorResponse",
     "SuccessResponse",

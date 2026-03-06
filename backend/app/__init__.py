@@ -5,7 +5,9 @@ Main FastAPI application
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.staticfiles import StaticFiles
 import logging
+from pathlib import Path
 
 from config import config
 from app.database import Base, engine, get_db
@@ -38,6 +40,13 @@ app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=["localhost", "127.0.0.1", "*.example.com"],
 )
+
+# Mount static files for uploaded documents
+# Ensure upload directory exists
+config.ensure_upload_directory()
+if config.UPLOAD_DIRECTORY.exists():
+    app.mount("/uploads", StaticFiles(directory=str(config.UPLOAD_DIRECTORY)), name="uploads")
+    logger.info(f"Static files (uploads) mounted at /uploads from {config.UPLOAD_DIRECTORY}")
 
 
 @app.get("/")

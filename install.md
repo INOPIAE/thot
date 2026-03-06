@@ -108,6 +108,10 @@ FRONTEND_URL=http://localhost:3000
 # CORS
 CORS_ORIGINS=http://localhost:3000
 
+# File Upload Configuration
+UPLOAD_DIRECTORY=./uploads
+MAX_UPLOAD_SIZE=52428800
+
 # Logging
 LOG_LEVEL=INFO
 ```
@@ -121,8 +125,31 @@ python scripts/init_db.py
 This will:
 - Create all database tables
 - Seed default roles and permissions
+- Create default restrictions (none, confidential, locked, privacy)
+- Create default work statuses (not yet, running, finished)
 
-### 5.5. Test Email Configuration
+### 5.5. Create Upload Directory
+
+The application stores uploaded PDF files in the filesystem. Create the upload directory:
+
+```bash
+# Create directory
+mkdir uploads
+
+# On Windows:
+# md uploads
+```
+
+The directory structure will be automatically managed:
+```
+uploads/
+  └── {record_id}/
+      └── {page_id}.pdf
+```
+
+> **Note:** Make sure the directory has appropriate permissions for the backend process to write files.
+
+### 5.6. Test Email Configuration
 
 Before running the application, test your SMTP configuration:
 
@@ -584,6 +611,112 @@ Each migration file has:
 - `downgrade()` - Operations to reverse when downgrading
 
 See the [Alembic Documentation](https://alembic.sqlalchemy.org/) for advanced usage.
+
+---
+
+## Using the Application
+
+### First Steps After Setup
+
+1. **Start both servers** (Backend and Frontend)
+2. **Open the frontend** in your browser: http://localhost:5173
+3. **Register a new account**
+   - The first user will automatically receive the **admin** role
+   - Subsequent users receive the **user** role
+4. **Check your email** for the verification link
+5. **Complete registration** by setting your password
+
+### Working with Records
+
+Records are the primary data entities in the system.
+
+#### Creating a Record
+
+1. Navigate to **Records** in the main menu
+2. Click **Create Record**
+3. Fill in the form:
+   - **Title** (required): Main identifier for the record
+   - **Signature**: Optional reference number
+   - **Description**: Detailed information about the record
+   - **Comment**: Additional notes
+   - **Keywords (Names)**: Comma-separated list (e.g., "Müller, Schmidt, Meyer")
+   - **Keywords (Locations)**: Comma-separated list (e.g., "Berlin, München, Hamburg")
+   - **Restriction**: Access control level (none, confidential, locked, privacy)
+   - **Work Status**: Current status (not yet, running, finished)
+4. Click **Save**
+
+#### Searching Records
+
+Use the search fields to filter records:
+- **Title Search**: Full-text search in titles
+- **Signature Search**: Search by signature/reference number
+- **Keyword Search**: Uses phonetic search algorithms
+  - Cologne Phonetic (optimized for German names)
+  - Double Metaphone (optimized for English)
+
+This enables fuzzy matching (e.g., "Müller" will also find "Mueller" or "Muller").
+
+### Working with Pages
+
+Pages belong to records and can contain PDF documents.
+
+#### Adding a Page to a Record
+
+1. Open a record (click **Edit** in the records list)
+2. Click **Manage Pages** button
+3. Click **Add Page** on the pages overview
+4. Fill in the form:
+   - **Page Name** (required): Identifier for this page
+   - **Description**: Brief description
+   - **Page Content**: Text transcription of the document
+   - **Comment**: Additional notes
+   - **Upload PDF File**: Select a PDF file (max 50MB)
+   - **Restriction**: Access control level
+   - **Work Status**: Current status
+5. Click **Save**
+
+#### Viewing Pages
+
+From the pages list, you can:
+- **View**: See all page details (text only, no PDF display)
+- **Edit**: Modify page information or upload a new PDF
+- **Delete**: Remove the page (soft delete, can be restored by admin)
+
+#### Accessing PDF Files
+
+PDF files are stored in the backend filesystem:
+```
+backend/uploads/{record_id}/{page_id}.pdf
+```
+
+They are accessible via:
+```
+http://localhost:8000/uploads/{record_id}/{page_id}.pdf
+```
+
+> **Note:** The overview page shows only text information. To view the actual PDF, you would need to implement a separate viewer page (not included in basic setup).
+
+### User Management (Admin/Support Only)
+
+Admins and support staff can:
+- View all registered users
+- Edit user details
+- Approve corporate memberships
+- Reset user passwords
+- Activate/deactivate accounts
+
+Access via: **Administration** → **User Management**
+
+### Role Management (Admin/Support Only)
+
+Manage user roles and permissions:
+- Assign roles to users
+- Create new roles
+- Configure role permissions
+
+Access via: **Administration** → **Roles**
+
+---
 
 ## Troubleshooting
 

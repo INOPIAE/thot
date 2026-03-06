@@ -18,7 +18,73 @@ from config import config
 security = HTTPBearer()
 
 
-def hash_password(password: str) -> str:
+def get_current_user_dependency(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = None
+):
+    """
+    Internal function to get current user from JWT token
+    Use get_current_user in routes instead
+    """
+    if db is None:
+        from app.database import get_db
+        db = next(get_db())
+    
+    token = credentials.credentials
+    user_id = decode_access_token(token)
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    from app.services.user_service import UserService
+    user = UserService.get_user_by_id(db, user_id)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    return user
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(None)
+):
+    """
+    Get current user from JWT token
+    FastAPI dependency for routes that require authentication
+    """
+    # Import here to avoid circular imports
+    from app.database import get_db
+    
+    # If db is None, we need to get it ourselves
+    if db is None:
+        from app.database import get_db
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            user = get_current_user_dependency(credentials, db)
+            return user
+        finally:
+            try:
+                db.close()
+            except:
+                pass
+    else:
+        return get_current_user_dependency(credentials, db)
     """Hash a password using SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
@@ -111,42 +177,46 @@ async def get_current_user(
 ):
     """
     Get current user from JWT token
-    FastAPI dependency for routes that require authentication
+    Dependency for routes that require authentication
+    
+    Note: This function needs to be called with db as a separate dependency
     """
-    # Import here to avoid circular imports
     from app.database import get_db
     from app.services.user_service import UserService
     
-    # Get database session
+    # Get a database session
     db_gen = get_db()
     db = next(db_gen)
     
-    token = credentials.credentials
-    user_id = decode_access_token(token)
+    try:
+        token = credentials.credentials
+        user_id = decode_access_token(token)
 
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        if not user_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
-    user = UserService.get_user_by_id(db, user_id)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    if not user.active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive",
-        )
+        user = UserService.get_user_by_id(db, user_id)
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        if not user.active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive",
+            )
 
-    return user
+        return user
+    finally:
+        db.close()
 
 
 def is_password_reset_needed(password: str) -> bool:
