@@ -31,6 +31,8 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 - ✅ Alembic migrations support for schema changes
 - ✅ RESTful API with FastAPI
 - ✅ Vue.js 3 Frontend with Pinia Store
+- ✅ Dynamic Logo and Favicon Loading from Backend
+- ✅ Environment-based Configuration (Dev/Production)
 - ✅ Comprehensive Unit Tests
 
 ## Requirements
@@ -244,18 +246,41 @@ SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
 
+# Application Configuration
+APP_NAME=NLF Database
+COMPANY_NAME=Your Company
+LOGO_URL=/assets/logo.png
+
 # File Upload Configuration
 UPLOAD_DIRECTORY=./uploads
 MAX_UPLOAD_SIZE=52428800
 
-# Watermark Configuration (optional)
+# Logo & Watermark Configuration
+# Logo URL is served via /assets static mount
 WATERMARK_IMAGE_PATH=./assets/logo.png
 ```
 
-### Frontend (.env.local)
+### Frontend (.env)
 ```env
+# Backend API Base URL (without /api/v1 suffix)
+VITE_BACKEND_URL=http://localhost:8000
+
+# API URL (full path to API endpoints)
 VITE_API_URL=http://localhost:8000/api/v1
 ```
+
+### Frontend (.env.production)
+```env
+# Production backend URL
+VITE_BACKEND_URL=https://api.yourdomain.com
+VITE_API_URL=https://api.yourdomain.com/api/v1
+```
+
+**Important Notes:**
+- `LOGO_URL` is a URL path (e.g., `/assets/logo.png`), served via backend static mount
+- `WATERMARK_IMAGE_PATH` is a file system path (e.g., `./assets/logo.png`), relative to backend directory
+- Frontend automatically fetches logo URL from backend config endpoint
+- Favicons are loaded dynamically from `/assets/favicons/` using `VITE_BACKEND_URL`
 
 ## Development Workflow
 

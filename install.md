@@ -155,9 +155,11 @@ MAX_UPLOAD_SIZE=52428800
 LOG_LEVEL=INFO
 ```
 
-### 5. (Optional) Configure Watermark Logo
+### 5. (Optional) Configure Logo and Favicons
 
-If you want to include your company logo in PDF watermarks:
+#### Application Logo (Header & Watermarks)
+
+If you want to include your company logo in the application header and PDF watermarks:
 
 1. **Create assets directory:**
    ```bash
@@ -169,15 +171,50 @@ If you want to include your company logo in PDF watermarks:
    backend/assets/logo.png
    ```
 
-3. **Enable in `.env`:**
+3. **Configure in `.env`:**
    ```env
+   # Logo URL (served via /assets mount point)
+   LOGO_URL=/assets/logo.png
+   
+   # Watermark logo path (for PDF overlay)
    WATERMARK_IMAGE_PATH=./assets/logo.png
    ```
 
 Logo specifications:
-- Recommended size: 100-200px width
-- Formats: PNG (with alpha), JPEG, GIF
-- Will be automatically scaled to fit header area
+- Recommended size: 100-200px width for header, proportionally scaled for watermarks
+- Formats: PNG (with alpha channel for transparency), JPEG, GIF
+- Logo is served via FastAPI's `/assets` static mount point
+- Frontend fetches logo URL from backend config endpoint
+
+#### Favicons
+
+1. **Place favicons** in the assets directory:
+   ```bash
+   mkdir backend/assets/favicons
+   ```
+
+2. **Add favicon files:**
+   ```
+   backend/assets/favicons/
+   ├── favicon.ico
+   ├── favicon-16x16.png
+   ├── favicon-32x32.png
+   ├── favicon-96x96.png
+   ├── apple-icon-*.png
+   ├── android-icon-192x192.png
+   ├── ms-icon-*.png
+   └── manifest.json
+   ```
+
+3. **Configuration:**
+   - Favicons are automatically loaded from backend `/assets/favicons/` endpoint
+   - Frontend loads favicons dynamically using `VITE_BACKEND_URL` environment variable
+   - No hardcoded URLs needed in HTML
+
+**How it works:**
+- Backend serves static files via `/assets` mount (configured in `app/__init__.py`)
+- Frontend utility `src/utils/favicon.js` dynamically injects favicon links at runtime
+- URLs are environment-specific (dev: `http://localhost:8000`, prod: from `.env.production`)
 
 ### 6. Initialize Database
 
@@ -288,12 +325,33 @@ npm install
 
 ### 2. Create Environment Configuration
 
-Create `.env.local` file in `frontend/` directory:
+Create `.env` file in `frontend/` directory:
 
 ```env
+# Backend API Base URL (without /api/v1 suffix)
 VITE_BACKEND_URL=http://localhost:8000
-VITE_ROOT_MOUNT=
+
+# API URL (full path to API endpoints)
+VITE_API_URL=http://localhost:8000/api/v1
 ```
+
+**For Production:**
+
+Create `.env.production` file:
+
+```env
+# Backend API Base URL (replace with your production domain)
+VITE_BACKEND_URL=https://api.yourdomain.com
+
+# API URL (full path to API endpoints)
+VITE_API_URL=https://api.yourdomain.com/api/v1
+```
+
+These environment variables are used for:
+- API calls to backend
+- Loading logo from backend `/assets/logo.png`
+- Loading favicons from backend `/assets/favicons/`
+- Dynamic configuration at build time via Vite
 
 ### 3. Run Development Server
 

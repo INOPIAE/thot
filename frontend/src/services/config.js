@@ -6,14 +6,37 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
+function normalizeLogoUrl(logoUrl) {
+  if (!logoUrl || typeof logoUrl !== 'string') {
+    return logoUrl
+  }
+
+  const value = logoUrl.trim()
+  if (!value) {
+    return value
+  }
+
+  // Keep absolute URLs unchanged.
+  if (/^https?:\/\//i.test(value)) {
+    return value
+  }
+
+  // Resolve relative paths against backend host so assets are loaded from API server.
+  return new URL(value, API_BASE_URL).toString()
+}
+
 /**
  * Fetch application configuration from backend
  * @returns {Promise<Object>} Application configuration
  */
 export async function fetchAppConfig() {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/config`)
-    return response.data || getDefaultConfig()
+    const response = await axios.get(`${API_BASE_URL}/api/v1/config`)
+    const config = response.data || getDefaultConfig()
+    return {
+      ...config,
+      logoUrl: normalizeLogoUrl(config.logoUrl),
+    }
   } catch (error) {
     console.warn('Failed to fetch config from backend, using defaults:', error.message)
     return getDefaultConfig()

@@ -27,10 +27,13 @@ export default defineComponent({
 
     return {
       appStore,
-      appConfig: APP_CONFIG,
+      defaultConfig: APP_CONFIG,
     }
   },
   computed: {
+    appConfig() {
+      return this.appStore.appConfig || this.defaultConfig
+    },
     currentLanguage: {
       get() {
         return this.appStore.currentLanguage

@@ -9,7 +9,11 @@ import App from './App.vue'
 import router from './router'
 import { useAppStore } from './stores/app'
 import { messages, datetimeFormats, numberFormats } from './locales/messages'
+import { initializeFavicons } from './utils/favicon'
 import './styles/global.css'
+
+// Initialize favicons dynamically from backend
+initializeFavicons()
 
 const i18n = createI18n({
   legacy: false,

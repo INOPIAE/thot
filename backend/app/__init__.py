@@ -48,6 +48,12 @@ if config.UPLOAD_DIRECTORY.exists():
     app.mount("/uploads", StaticFiles(directory=str(config.UPLOAD_DIRECTORY)), name="uploads")
     logger.info(f"Static files (uploads) mounted at /uploads from {config.UPLOAD_DIRECTORY}")
 
+# Mount assets for logo and other static assets
+assets_dir = Path(__file__).parent.parent / "assets"
+if assets_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+    logger.info(f"Static files (assets) mounted at /assets from {assets_dir}")
+
 
 @app.get("/")
 async def root():
