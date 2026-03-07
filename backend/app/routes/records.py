@@ -152,6 +152,33 @@ async def list_records(
     }
 
 
+@router.get("/reduced")
+async def list_reduced_records(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+    signature: Optional[str] = Query(None, description="Filter by signature (partial match)"),
+):
+    """
+    List reduced records with only id, name and signature.
+    Sorted ascending by signature.
+    """
+    query = db.query(Record).filter(Record.active == True)
+
+    if signature:
+        query = query.filter(Record.signature.ilike(f"%{signature}%"))
+
+    records = query.order_by(Record.signature.asc(), Record.title.asc()).all()
+
+    return [
+        {
+            "id": str(record.id),
+            "name": record.title,
+            "signature": record.signature,
+        }
+        for record in records
+    ]
+
+
 @router.get("/{record_id}")
 async def get_record(
     record_id: str,
@@ -392,6 +419,36 @@ async def get_restrictions(
     }
 
 
+@router.get("/metadata/restrictions/by-name")
+async def get_restriction_id_by_name(
+    name: str = Query(..., min_length=1, description="Restriction name (exact match, case-insensitive)"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Get restriction ID by restriction name.
+    """
+    normalized_name = name.strip()
+    if not normalized_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Restriction name must not be empty"
+        )
+
+    restriction = db.query(Restriction).filter(Restriction.name.ilike(normalized_name)).first()
+
+    if not restriction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Restriction not found"
+        )
+
+    return {
+        "id": str(restriction.id),
+        "name": restriction.name,
+    }
+
+
 @router.get("/metadata/workstatus")
 async def get_workstatus(
     db: Session = Depends(get_db),
@@ -413,4 +470,35 @@ async def get_workstatus(
             }
             for ws in workstatus_list
         ]
+    }
+
+
+@router.get("/metadata/workstatus/by-name")
+async def get_workstatus_id_by_name(
+    name: str = Query(..., min_length=1, description="Workstatus name (exact match, case-insensitive)"),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Get workstatus ID by status name.
+    """
+    normalized_name = name.strip()
+    if not normalized_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Workstatus name must not be empty"
+        )
+
+    workstatus = db.query(WorkStatus).filter(WorkStatus.status.ilike(normalized_name)).first()
+
+    if not workstatus:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workstatus not found"
+        )
+
+    return {
+        "id": str(workstatus.id),
+        "status": workstatus.status,
+        "area": workstatus.area.area if workstatus.area else None,
     }

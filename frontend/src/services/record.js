@@ -18,6 +18,22 @@ export const recordService = {
   },
 
   /**
+   * Get reduced records list (id, name, signature), sorted by signature
+   */
+  async listReducedRecords(signature = null) {
+    try {
+      const params = {}
+      if (signature) {
+        params.signature = signature
+      }
+      const response = await api.get('/records/reduced', { params })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
    * Get a specific record by ID
    */
   async getRecord(recordId) {
