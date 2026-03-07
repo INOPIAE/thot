@@ -49,24 +49,27 @@ def _build_overlay_page(
     right_x = width - 36
     top_y = height - 36
 
+    text_start_x = left_x
     if watermark_image_path and watermark_image_path.exists() and watermark_image_path.is_file():
-        image_reader = ImageReader(str(watermark_image_path))
-        img_width, img_height = image_reader.getSize()
-        target_height = 58
-        scale = target_height / max(img_height, 1)
-        target_width = max(32, img_width * scale)
-        overlay.drawImage(
-            image_reader,
-            left_x,
-            top_y - target_height,
-            width=target_width,
-            height=target_height,
-            preserveAspectRatio=True,
-            mask="auto",
-        )
-        text_start_x = left_x + target_width + 14
-    else:
-        text_start_x = left_x
+        try:
+            image_reader = ImageReader(str(watermark_image_path))
+            img_width, img_height = image_reader.getSize()
+            target_height = 58
+            scale = target_height / max(img_height, 1)
+            target_width = max(32, img_width * scale)
+            overlay.drawImage(
+                image_reader,
+                left_x,
+                top_y - target_height,
+                width=target_width,
+                height=target_height,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+            text_start_x = left_x + target_width + 14
+        except Exception:
+            # Do not fail watermark generation when logo loading is broken.
+            text_start_x = left_x
 
     overlay.setFillColor(Color(0.1, 0.1, 0.1, alpha=0.9))
     overlay.setFont("Helvetica-Bold", 14)
@@ -209,7 +212,7 @@ def create_thumbnail_with_watermark(
         top_y = int(20 * scale_y)
         
         # Optional logo
-        if watermark_image_path and watermark_image_path.exists():
+        if watermark_image_path and watermark_image_path.exists() and watermark_image_path.is_file():
             try:
                 logo = Image.open(watermark_image_path)
                 logo_height = int(25 * scale_y)
