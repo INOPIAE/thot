@@ -124,8 +124,8 @@ async def list_records(
     # Get total count
     total = query.distinct().count()
 
-    # Get paginated results
-    records = query.distinct().offset(skip).limit(limit).all()
+    # Get paginated results, sorted by signature ascending, then title
+    records = query.distinct().order_by(Record.signature.asc(), Record.title.asc()).offset(skip).limit(limit).all()
 
     return {
         "items": [
