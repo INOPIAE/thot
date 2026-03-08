@@ -46,7 +46,9 @@
       <li v-if="authStore.hasRole('support') || authStore.hasRole('admin')" class="nav-section">
         <span class="nav-label">{{ t('nav.administration') }}</span>
         <ul>
-          <li><router-link to="/admin/roles" @click="closeMenu">{{ t('nav.roles') }}</router-link></li>
+          <li v-if="authStore.hasRole('admin')">
+            <router-link to="/admin/roles" @click="closeMenu">{{ t('nav.roles') }}</router-link>
+          </li>
           <li><router-link to="/admin/data-maintenance" @click="closeMenu">{{ t('nav.dataMaintenance') }}</router-link></li>
         </ul>
       </li>

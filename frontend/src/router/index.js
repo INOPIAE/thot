@@ -58,7 +58,7 @@ const routes = [
     path: '/admin/roles',
     name: 'RoleManagement',
     component: () => import('@/views/admin/RoleManagement.vue'),
-    meta: { requiresAuth: true, requiresRole: ['admin', 'support'] },
+    meta: { requiresAuth: true, requiresRole: ['admin'] },
   },
   {
     path: '/admin/data-maintenance',
