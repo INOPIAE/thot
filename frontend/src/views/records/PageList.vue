@@ -193,13 +193,13 @@ export default {
       return Math.ceil(this.total / this.pageSize)
     },
     canCreatePage() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
     },
     canEditPage() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_page')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
     },
     canUploadExistingPage() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
     },
   },
   methods: {

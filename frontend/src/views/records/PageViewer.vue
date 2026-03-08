@@ -10,7 +10,7 @@
           {{ $t('common.edit') }}
         </router-link>
         <router-link
-          :to="`/records/${recordId}/pages`"
+          :to="backToListUrl"
           class="btn btn-secondary"
         >
           {{ $t('common.back') }}
@@ -184,9 +184,15 @@
 <script>
 import { pageService } from '@/services/page'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'PageViewer',
+    setup() {
+      return {
+        authStore: useAuthStore(),
+      }
+    },
   data() {
     return {
       page: null,
@@ -208,6 +214,18 @@ export default {
     },
     pdfViewerUrl() {
       return this.pdfBlobUrl
+        canManagePages() {
+          return this.authStore.hasRole('admin') || 
+                 this.authStore.hasRole('user_record') || 
+                 this.authStore.hasRole('user_scan') || 
+                 this.authStore.hasRole('user_page')
+        },
+        backToListUrl() {
+          if (this.canManagePages) {
+            return `/records/${this.recordId}/pages`
+          }
+          return `/records/${this.recordId}/pages-gallery`
+        },
     },
   },
   mounted() {
@@ -593,17 +611,6 @@ export default {
 .btn-secondary:hover {
   background-color: #5a6268;
   border-color: #545b62;
-}
-
-.btn-light {
-  color: #212529;
-  background-color: #f8f9fa;
-  border-color: #f8f9fa;
-}
-
-.btn-light:hover {
-  background-color: #e2e6ea;
-  border-color: #dae0e5;
 }
 
 @media (max-width: 1200px) {

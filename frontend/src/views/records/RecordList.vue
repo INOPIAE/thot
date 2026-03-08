@@ -134,7 +134,7 @@
             <td class="pages-count">{{ record.page_count || 0 }}</td>
             <td>{{ formatDate(record.created_on) }}</td>
             <td class="actions-cell">
-              <router-link :to="`/records/${record.id}/pages`" class="btn btn-sm btn-secondary">
+              <router-link :to="getPagesUrl(record.id)" class="btn btn-sm btn-secondary">
                 {{ $t('pages.title') }}
               </router-link>
               <router-link v-if="canEditRecord" :to="`/records/${record.id}`" class="btn btn-sm btn-info">
@@ -210,16 +210,29 @@ export default defineComponent({
       return Math.ceil(this.totalRecords / this.pageSize)
     },
     canCreateRecord() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
     },
     canEditRecord() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_page')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
+    },
+    canManagePages() {
+      return this.authStore.hasRole('admin') || 
+             this.authStore.hasRole('user_record') || 
+             this.authStore.hasRole('user_scan') || 
+             this.authStore.hasRole('user_page')
     },
   },
   mounted() {
     this.loadRecords()
   },
   methods: {
+    getPagesUrl(recordId) {
+      // Users with management roles go to pages list, others to gallery
+      if (this.canManagePages) {
+        return `/records/${recordId}/pages`
+      }
+      return `/records/${recordId}/pages-gallery`
+    },
     async loadRecords() {
       this.loading = true
       this.error = null

@@ -16,7 +16,7 @@
           {{ $t('common.edit') }}
         </router-link>
         <router-link
-          :to="`/records/${recordId}/pages`"
+          :to="backToListUrl"
           class="btn btn-secondary"
         >
           {{ $t('common.back') }}
@@ -150,9 +150,15 @@
 
 <script>
 import { pageService } from '@/services/page'
+import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'PageDetail',
+    setup() {
+      return {
+        authStore: useAuthStore(),
+      }
+    },
   data() {
     return {
       page: null,
@@ -166,6 +172,18 @@ export default {
     },
     pageId() {
       return this.$route.params.pageId
+        canManagePages() {
+          return this.authStore.hasRole('admin') || 
+                 this.authStore.hasRole('user_record') || 
+                 this.authStore.hasRole('user_scan') || 
+                 this.authStore.hasRole('user_page')
+        },
+        backToListUrl() {
+          if (this.canManagePages) {
+            return `/records/${this.recordId}/pages`
+          }
+          return `/records/${this.recordId}/pages-gallery`
+        },
     },
   },
   mounted() {

@@ -91,6 +91,10 @@ def seed_database():
             {
                 "name": "user_page",
                 "description": "User is allowed to change page entries"
+            },
+            {
+                "name": "user_record",
+                "description": "User is allowed to create and edit records"
             }
         ]
 

@@ -237,6 +237,17 @@ button:not(.btn-secondary):not(.btn-danger):not(.btn-ghost):hover {
   transform: translateY(-2px);
 }
 
+.btn-light {
+  background-color: #f8f9fa;
+  color: #212529;
+  border: 1px solid #d6dbe1;
+}
+
+.btn-light:hover {
+  background-color: #e9ecef;
+  transform: translateY(-2px);
+}
+
 .btn-danger {
   background-color: var(--color-danger);
   color: var(--color-bg-white);

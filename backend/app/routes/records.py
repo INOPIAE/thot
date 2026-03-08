@@ -227,12 +227,12 @@ async def create_record(
 ):
     """
     Create a new record
-    Only users with 'admin' or 'user_scan' role can create records
+    Only users with 'admin' or 'user_record' role can create records
         # Check user permissions
-        if not (current_user.has_role("admin") or current_user.has_role("user_scan")):
+        if not (current_user.has_role("admin") or current_user.has_role("user_record")):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions. Only admin or user_scan can create records."
+                detail="Insufficient permissions. Only admin or user_record can create records."
             )
     
     """
@@ -308,12 +308,12 @@ async def update_record(
 ):
     """
     Update a record
-    Only users with 'admin' or 'user_page' role can update records
+    Only users with 'admin' or 'user_record' role can update records
         # Check user permissions
-        if not (current_user.has_role("admin") or current_user.has_role("user_page")):
+        if not (current_user.has_role("admin") or current_user.has_role("user_record")):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions. Only admin or user_page can update records."
+                detail="Insufficient permissions. Only admin or user_record can update records."
             )
     
     """

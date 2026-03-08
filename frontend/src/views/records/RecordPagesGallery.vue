@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="gallery-header">
       <div class="header-title">
-        <router-link :to="`/records`" class="btn btn-link">
+        <router-link :to="`/records`" class="btn btn-light">
           {{ $t('common.back') }}
         </router-link>
         <h1>{{ $t('pages.galleryTitle') }}: {{ recordTitle }}</h1>
@@ -16,7 +16,7 @@
         >
           {{ showThumbnails ? '◄ ' : '► ' }}{{ $t('pages.allPages') }}
         </button>
-        <router-link :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
+        <router-link v-if="canManagePages" :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
           {{ $t('pages.createNew') }}
         </router-link>
       </div>
@@ -38,7 +38,7 @@
       <div v-show="showThumbnails" class="thumbnails-panel">
         <div v-if="pages.length === 0" class="empty-state">
           <p>{{ $t('pages.noPages') }}</p>
-          <router-link :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
+          <router-link v-if="canManagePages" :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
             {{ $t('pages.createNew') }}
           </router-link>
         </div>
@@ -119,9 +119,15 @@
 <script>
 import { pageService } from '@/services/page'
 import { recordService } from '@/services/record'
+import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'RecordPagesGallery',
+    setup() {
+      return {
+        authStore: useAuthStore(),
+      }
+    },
   data() {
     return {
       pages: [],
@@ -140,6 +146,12 @@ export default {
   computed: {
     recordId() {
       return this.$route.params.recordId
+    },
+    canManagePages() {
+      return this.authStore.hasRole('admin') ||
+             this.authStore.hasRole('user_record') ||
+             this.authStore.hasRole('user_scan') ||
+             this.authStore.hasRole('user_page')
     },
   },
   mounted() {
@@ -635,7 +647,3 @@ export default {
   }
 }
 </style>
-
-    toggleThumbnails() {
-      this.showThumbnails = !this.showThumbnails
-    },
