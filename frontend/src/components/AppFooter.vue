@@ -10,26 +10,46 @@
         </span>
       </div>
       <div class="footer-right">
-        <span>© {{ currentYear }} . {{ $t('common.copyright', { year: currentYear, company: appConfig.companyName }) }} powered by {{ appConfig.companyName }}</span>
+        <span>
+          {{ $t('common.copyright', { year: footerYearLabel, company: 'NLF Database Contributors' }) }}
+          {{ $t('common.poweredBy', { company: footerCompany }) }}
+        </span>
       </div>
     </div>
   </footer>
 </template>
 
 <script>
-import { defineComponent } from 'vue'
+import { computed, defineComponent } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { APP_CONFIG } from '@/config/app'
+import { useAppStore } from '@/stores/app'
 
 export default defineComponent({
   name: 'AppFooter',
   setup() {
     const authStore = useAuthStore()
+    const appStore = useAppStore()
+    const footerCompany = computed(() => appStore.getConfig('companyName', APP_CONFIG.companyName))
+    const footerYear = computed(() => Number(appStore.getConfig('copyrightYear', APP_CONFIG.copyrightYear)))
+    const footerYearLabel = computed(() => {
+      const currentYear = new Date().getFullYear()
+
+      if (!Number.isFinite(footerYear.value)) {
+        return String(currentYear)
+      }
+
+      if (footerYear.value < currentYear) {
+        return `${footerYear.value}-${currentYear}`
+      }
+
+      return String(footerYear.value)
+    })
 
     return {
       authStore,
-      appConfig: APP_CONFIG,
-      currentYear: new Date().getFullYear(),
+      footerCompany,
+      footerYearLabel,
     }
   },
 })
