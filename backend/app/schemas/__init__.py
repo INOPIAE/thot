@@ -275,6 +275,7 @@ class UserUpdateSupportRequest(BaseModel):
 
     corporate_number: Optional[str] = Field(None, max_length=255)
     corporate_approved: Optional[bool] = None
+    active: Optional[bool] = None
 
 
 # ========================

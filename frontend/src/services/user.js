@@ -140,6 +140,30 @@ export const userService = {
       throw error.response?.data || error
     }
   },
+
+  /**
+   * Start password reset for user (admin/support)
+   */
+  async startPasswordReset(userId) {
+    try {
+      const response = await api.put(`/users/${userId}/password-reset`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
+   * Get user statistics (admin/support)
+   */
+  async getUserStatistics() {
+    try {
+      const response = await api.get('/users/statistics')
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
 }
 
 export default userService

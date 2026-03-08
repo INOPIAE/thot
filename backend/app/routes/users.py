@@ -4,8 +4,10 @@ User routes for profile and user management
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.database import get_db
+from app.models.user import User
 from app.schemas import (
     UserResponse,
     UserDetailResponse,
@@ -146,7 +148,12 @@ async def list_users(
     """
     List users with filters (support/admin only)
     """
-    # TODO: Check if user has support/admin role
+    # Check if user has support/admin role
+    if not (current_user.has_role("support") or current_user.has_role("admin")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to access user management",
+        )
 
     users, total = UserService.list_users(
         db=db,
@@ -179,6 +186,33 @@ async def list_users(
     }
 
 
+@router.get("/statistics", response_model=dict)
+async def get_user_statistics(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Get user statistics (support/admin only)
+    Returns total, active, and inactive user counts
+    """
+    # Check if user has support/admin role
+    if not (current_user.has_role("support") or current_user.has_role("admin")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to access user statistics",
+        )
+
+    total = db.query(func.count(User.id)).scalar()
+    active = db.query(func.count(User.id)).filter(User.active == True).scalar()
+    inactive = db.query(func.count(User.id)).filter(User.active == False).scalar()
+
+    return {
+        "total": total,
+        "active": active,
+        "inactive": inactive,
+    }
+
+
 @router.get("/{user_id}", response_model=UserDetailSupportResponse)
 async def get_user_detail(
     user_id: str,
@@ -188,7 +222,12 @@ async def get_user_detail(
     """
     Get user detail (support/admin only)
     """
-    # TODO: Check if user has support/admin role
+    # Check if user has support/admin role
+    if not (current_user.has_role("support") or current_user.has_role("admin")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
 
     user = UserService.get_user_by_id(db, user_id)
     if not user:
@@ -223,7 +262,12 @@ async def update_user(
     """
     Update user as support/admin
     """
-    # TODO: Check if user has support/admin role
+    # Check if user has support/admin role
+    if not (current_user.has_role("support") or current_user.has_role("admin")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
 
     user = UserService.update_user_as_support(
         db=db,
@@ -231,6 +275,7 @@ async def update_user(
         admin_id=str(current_user.id),
         corporate_number=request.corporate_number,
         corporate_approved=request.corporate_approved,
+        active=request.active,
     )
 
     return UserResponse(

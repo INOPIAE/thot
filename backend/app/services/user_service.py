@@ -275,6 +275,7 @@ class UserService:
         admin_id: str,
         corporate_number: Optional[str] = None,
         corporate_approved: Optional[bool] = None,
+        active: Optional[bool] = None,
     ) -> User:
         """Update user account as support/admin"""
         user = UserService.get_user_by_id(db, user_id)
@@ -285,6 +286,8 @@ class UserService:
             user.corporate_number = corporate_number
         if corporate_approved is not None:
             user.corporate_approved = corporate_approved
+        if active is not None:
+            user.active = active
 
         user.last_modified_on = datetime.utcnow()
         user.last_modified_by = admin_id
