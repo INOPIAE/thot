@@ -73,20 +73,6 @@
         <div v-for="page in pages" :key="page.id" class="page-card">
           <div class="page-card-header">
             <h3>{{ page.name }}</h3>
-            <div class="page-actions">
-              <router-link :to="`/records/${recordId}/pages/${page.id}`" class="btn btn-sm btn-info">
-                {{ $t('pages.openOverview') }}
-              </router-link>
-              <router-link :to="`/records/${recordId}/pages/${page.id}/viewer`" class="btn btn-sm btn-primary">
-                {{ $t('pages.openPdfViewer') }}
-              </router-link>
-              <router-link :to="`/records/${recordId}/pages/${page.id}/edit`" class="btn btn-sm btn-secondary">
-                {{ $t('common.edit') }}
-              </router-link>
-              <button class="btn btn-sm btn-danger" @click="handleDelete(page.id)">
-                {{ $t('common.delete') }}
-              </button>
-            </div>
           </div>
           <div class="page-card-body">
             <p v-if="page.description" class="page-description">
@@ -116,6 +102,20 @@
             <small v-if="page.created_on" class="text-muted">
               {{ $t('pages.createdOn') }}: {{ formatDate(page.created_on) }}
             </small>
+            <div class="page-actions">
+              <router-link :to="`/records/${recordId}/pages/${page.id}`" class="btn btn-sm btn-info">
+                {{ $t('pages.openOverview') }}
+              </router-link>
+              <router-link :to="`/records/${recordId}/pages/${page.id}/viewer`" class="btn btn-sm btn-primary">
+                {{ $t('pages.openPdfViewer') }}
+              </router-link>
+              <router-link :to="`/records/${recordId}/pages/${page.id}/edit`" class="btn btn-sm btn-secondary">
+                {{ $t('common.edit') }}
+              </router-link>
+              <button class="btn btn-sm btn-danger" @click="handleDelete(page.id)">
+                {{ $t('common.delete') }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -348,22 +348,18 @@ export default {
   padding: 1rem;
   background: #f9f9f9;
   border-bottom: 1px solid #eee;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
 }
 
 .page-card-header h3 {
   margin: 0;
   word-break: break-word;
-  flex: 1;
 }
 
 .page-actions {
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+  margin-top: 0.75rem;
 }
 
 .page-card-body {
@@ -417,6 +413,9 @@ export default {
   padding: 0.75rem 1rem;
   background: #fafafa;
   border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .pagination {
