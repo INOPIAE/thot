@@ -56,8 +56,8 @@ export default defineComponent({
 
 <style scoped>
 .app-header {
-  background-color: #2c3e50;
-  color: white;
+  background-color: var(--color-header-footer-bg);
+  color: var(--color-header-footer-text);
   padding: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -95,8 +95,8 @@ export default defineComponent({
 .language-select {
   padding: 0.5rem;
   background-color: transparent;
-  color: white;
-  border: 1px solid white;
+  color: var(--color-header-footer-text);
+  border: 1px solid var(--color-header-footer-text);
   border-radius: 4px;
   cursor: pointer;
 }

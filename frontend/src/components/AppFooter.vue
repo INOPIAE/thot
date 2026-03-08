@@ -57,8 +57,8 @@ export default defineComponent({
 
 <style scoped>
 .app-footer {
-  background-color: #2c3e50;
-  color: white;
+  background-color: var(--color-header-footer-bg);
+  color: var(--color-header-footer-text);
   padding: 1rem;
   text-align: center;
   border-top: 1px solid #ddd;

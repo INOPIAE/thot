@@ -27,6 +27,10 @@
   --color-bg-white: #fff;
   
   --color-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  
+  /* Header & Footer */
+  --color-header-footer-bg: #a0d278;
+  --color-header-footer-text: #2c3e50;
 }
 
 /* ========================================
