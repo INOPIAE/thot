@@ -10,7 +10,11 @@
     <!-- Navigation Links -->
     <ul class="nav-list">
       <!-- Home -->
-      <li><router-link to="/" @click="closeMenu">{{ t('nav.home') }}</router-link></li>
+      <li class="nav-section">
+        <ul>
+          <li><router-link to="/" @click="closeMenu">{{ t('nav.home') }}</router-link></li>
+        </ul>
+      </li>
 
       <!-- Authentication Section -->
       <li v-if="!authStore.isAuthenticated" class="nav-section">
