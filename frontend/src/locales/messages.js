@@ -378,6 +378,14 @@ export const messages = {
       unknownRecord: 'Unknown Record',
     },
 
+    // Home
+    home: {
+      pendingApprovalTitle: 'Users Pending Corporate Approval',
+      pendingApprovalMessageOne: 'There is {count} user with active status waiting for corporate approval.',
+      pendingApprovalMessageOther: 'There are {count} users with active status waiting for corporate approval.',
+      viewUsers: 'Go to User Management',
+    },
+
     // Messages
     messages: {
       loadingError: 'Failed to load data',
@@ -791,6 +799,14 @@ export const messages = {
       pageCount: 'Gesamtzahl Seiten',
       totalCount: 'Gesamtzahl Datensätze',
       pagingInfo: 'Seite {current} von {total}',
+    },
+
+    // Home
+    home: {
+      pendingApprovalTitle: 'Benutzer warten auf Unternehmensfreigabe',
+      pendingApprovalMessageOne: 'Es wartet {count} Benutzer mit aktivem Status auf die Unternehmensfreigabe.',
+      pendingApprovalMessageOther: 'Es warten {count} Benutzer mit aktivem Status auf die Unternehmensfreigabe.',
+      viewUsers: 'Zur Benutzerverwaltung',
     },
 
     // Messages

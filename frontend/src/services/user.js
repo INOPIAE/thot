@@ -165,6 +165,18 @@ export const userService = {
     }
   },
 
+    /**
+     * Get count of users pending corporate approval (admin/support)
+     */
+    async getPendingApprovalCount() {
+      try {
+        const response = await api.get('/users/pending-approval')
+        return response.data
+      } catch (error) {
+        throw error.response?.data || error
+      }
+    },
+
   /**
    * Get user roles (admin/support)
    */

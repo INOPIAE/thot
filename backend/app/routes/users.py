@@ -216,6 +216,32 @@ async def get_user_statistics(
     }
 
 
+@router.get("/pending-approval", response_model=dict)
+async def get_pending_approval_users(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Get count of users pending corporate approval (support/admin only)
+    Returns count of users with active=True and corporate_approved=False
+    """
+    # Check if user has support/admin role
+    if not (current_user.has_role("support") or current_user.has_role("admin")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to access user information",
+        )
+
+    pending_count = db.query(func.count(User.id)).filter(
+        User.active == True,
+        User.corporate_approved == False
+    ).scalar()
+
+    return {
+        "pending_approval_count": pending_count,
+    }
+
+
 @router.get("/{user_id}", response_model=UserDetailSupportResponse)
 async def get_user_detail(
     user_id: str,
