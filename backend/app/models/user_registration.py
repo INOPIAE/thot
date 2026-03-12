@@ -5,7 +5,7 @@ User Registration model
 from datetime import datetime
 import uuid
 
-from sqlalchemy import Column, String, DateTime, UUID
+from sqlalchemy import Column, String, DateTime, UUID, Boolean
 
 from app.database import Base
 
@@ -22,6 +22,7 @@ class UserRegistration(Base):
     email = Column(String(255), nullable=False, index=True)
     token = Column(String(255), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime(timezone=True), nullable=False)
+    admin = Column(Boolean, default=False, nullable=False)
 
     def __repr__(self) -> str:
         return f"<UserRegistration(id={self.id}, username={self.username}, email={self.email})>"

@@ -20,6 +20,8 @@ from .records_keywords_name import RecordsKeywordsName
 from .records_keywords_location import RecordsKeywordsLocation
 from .page import Page
 from .restriction_detail import RestrictionDetail
+from .user_confirmation import UserConfirmation
+from .user_confirmations import UserConfirmations
 
 __all__ = [
     "User",
@@ -40,4 +42,6 @@ __all__ = [
     "RecordsKeywordsLocation",
     "Page",
     "RestrictionDetail",
+    "UserConfirmation",
+    "UserConfirmations",
 ]
