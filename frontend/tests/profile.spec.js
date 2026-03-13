@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import Profile from '@/views/user/Profile.vue'
@@ -22,7 +22,7 @@ const messages = {
       email: 'Email',
       firstName: 'First Name',
       lastName: 'Last Name',
-      corporateNumber: 'Corporate Number',
+      corporateNumber: 'Membership Number',
       language: 'Language',
       save: 'Save',
       loading: 'Loading...',
@@ -49,7 +49,7 @@ const messages = {
       pendingApproval: 'Pending Approval',
     },
     admin: {
-      approveCorporate: 'Approve Corporate',
+      approveCorporate: 'Approve Membership Number',
     },
     messages: {
       loadingError: 'Error loading data',
@@ -321,7 +321,7 @@ describe('Profile.vue', () => {
       },
     })
 
-    await wrapper.vm.$nextTick()
+    await flushPromises()
 
     wrapper.vm.editData.first_name = 'Updated'
     wrapper.vm.editData.current_language = 'de'

@@ -166,7 +166,7 @@ export const userService = {
   },
 
     /**
-     * Get count of users pending corporate approval (admin/support)
+     * Get count of users pending membership number approval (admin/support)
      */
     async getPendingApprovalCount() {
       try {
