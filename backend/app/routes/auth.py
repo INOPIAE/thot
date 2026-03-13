@@ -234,9 +234,18 @@ async def login(
             detail="Die Anmeldung ist fehlgeschlagen"
         )
 
-    # Check if OTP is enabled and provided
-    if user.otp_enabled:
+    # Require OTP either when user has OTP enabled or when privileged role is assigned.
+    requires_role_based_otp = user.has_role("support") or user.has_role("admin")
+    otp_required = user.otp_enabled or requires_role_based_otp
+
+    if otp_required:
         if not request.otp_code:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Die Anmeldung ist fehlgeschlagen"
+            )
+
+        if not user.otp_secret:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Die Anmeldung ist fehlgeschlagen"

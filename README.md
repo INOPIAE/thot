@@ -112,7 +112,8 @@ Legal pages:
 ```
 
 Notes:
-- `otp_code` is optional. Use it only if OTP is enabled for the user.
+- `otp_code` is required when OTP is enabled for the user.
+- `otp_code` is also required for users with role `support` or `admin`.
 - On success, response contains `access_token` and `token_type`.
 
 ### 3. Authenticate in Swagger
@@ -128,7 +129,7 @@ Notes:
 
 ### 5. Typical Auth Errors
 - `401 Unauthorized`: token missing/invalid/expired.
-- `403 Forbidden`: account inactive or OTP required but not provided.
+- `401 Unauthorized`: login failed (e.g. wrong credentials, missing OTP, invalid OTP, inactive account).
 
 ## Project Structure
 

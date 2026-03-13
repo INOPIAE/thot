@@ -841,7 +841,7 @@ const messages = {
 #### Authentication
 - `POST /api/v1/auth/register` - Register new user
 - `GET /api/v1/auth/register/confirm/{token}` - Confirm registration
-- `POST /api/v1/auth/login` - Login with username/password
+- `POST /api/v1/auth/login` - Login with username/password (+ OTP required for role support/admin, and for users with OTP enabled)
 - `POST /api/v1/auth/password-reset` - Request password reset
 - `POST /api/v1/auth/password-reset/confirm/{token}` - Confirm password reset
 - `GET /api/v1/auth/otp-reset/confirm/{token}` - Validate support OTP reset link and return OTP setup payload
