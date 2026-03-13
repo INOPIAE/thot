@@ -96,6 +96,7 @@ class UserResponse(BaseModel):
     current_language: str
     corporate_number: Optional[str]
     corporate_approved: bool
+    otp_enabled: bool
     active: bool
     created_on: datetime
     roles: List[str] = []
@@ -191,6 +192,13 @@ class EmailChangeConfirmRequest(BaseModel):
 class OTPEnableRequest(BaseModel):
     """Request to enable OTP"""
 
+    otp_code: str = Field(..., min_length=6, max_length=6)
+
+
+class OTPResetConfirmRequest(BaseModel):
+    """Confirm OTP reset with temporary token"""
+
+    token: str = Field(..., min_length=20, max_length=255)
     otp_code: str = Field(..., min_length=6, max_length=6)
 
 
@@ -408,6 +416,7 @@ __all__ = [
     "EmailChangeRequest",
     "EmailChangeConfirmRequest",
     "OTPEnableRequest",
+    "OTPResetConfirmRequest",
     "RoleBase",
     "RoleResponse",
     "UserRoleAssignRequest",

@@ -10,6 +10,7 @@ from .role_permission import RolePermission
 from .base import BaseModel
 from .user_registration import UserRegistration
 from .password_reset_token import PasswordResetToken
+from .otp_reset_token import OTPResetToken
 from .workstatus_area import WorkStatusArea
 from .workstatus import WorkStatus
 from .restriction import Restriction
@@ -32,6 +33,7 @@ __all__ = [
     "BaseModel",
     "UserRegistration",
     "PasswordResetToken",
+    "OTPResetToken",
     "WorkStatusArea",
     "WorkStatus",
     "Restriction",

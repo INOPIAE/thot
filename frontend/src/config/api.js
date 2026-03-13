@@ -24,6 +24,8 @@ export const API_ENDPOINTS = {
   USER_EMAIL_CHANGE_CONFIRM: '/users/email-change/confirm/:token',
   USER_OTP_ENABLE: '/users/otp/enable',
   USER_OTP_DISABLE: '/users/otp/disable',
+  USER_OTP_RESET: '/users/otp/reset',
+  USER_OTP_RESET_CONFIRM: '/users/otp/reset/confirm',
 
   // User Management (Support)
   USERS_LIST: '/users',

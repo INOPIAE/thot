@@ -14,13 +14,14 @@ from app.schemas import (
     UserDetailResponse,
     UserUpdateRequest,
     PasswordChangeRequest,
+    OTPResetConfirmRequest,
     UserListResponse,
     UserDetailSupportResponse,
     UserUpdateSupportRequest,
     UserRoleAssignRequest,
     UserRoleResponse,
 )
-from app.services import UserService
+from app.services import UserService, OTPResetService
 from app.services.password_reset_service import PasswordResetService
 from app.utils import decode_access_token
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -75,6 +76,7 @@ async def get_user_profile(
         current_language=current_user.current_language,
         corporate_number=current_user.corporate_number,
         corporate_approved=current_user.corporate_approved,
+        otp_enabled=current_user.otp_enabled,
         active=current_user.active,
         created_on=current_user.created_on,
         roles=current_user.get_roles(),
@@ -108,6 +110,7 @@ async def update_user_profile(
         current_language=user.current_language,
         corporate_number=user.corporate_number,
         corporate_approved=user.corporate_approved,
+        otp_enabled=user.otp_enabled,
         active=user.active,
         created_on=user.created_on,
         roles=user.get_roles(),
@@ -316,10 +319,63 @@ async def update_user(
         current_language=user.current_language,
         corporate_number=user.corporate_number,
         corporate_approved=user.corporate_approved,
+        otp_enabled=user.otp_enabled,
         active=user.active,
         created_on=user.created_on,
         roles=user.get_roles(),
     )
+
+
+@router.post("/otp/reset")
+async def start_otp_reset(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Start OTP reset for current user and return temporary setup data
+    """
+    user, token_entry, otp_setup_data, error = OTPResetService.start_user_otp_reset(
+        db=db,
+        user_id=current_user.id,
+    )
+    if error or not user or not token_entry or not otp_setup_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error or "Could not start OTP reset",
+        )
+
+    return {
+        "message": "OTP reset initiated. Configure your authenticator app with the temporary setup data and confirm the generated code.",
+        "token": token_entry.token,
+        "otp_setup": otp_setup_data,
+        "expires_in_hours": config.USER_OTP_RESET_TOKEN_EXPIRE_HOURS,
+    }
+
+
+@router.post("/otp/reset/confirm")
+async def confirm_otp_reset(
+    request: OTPResetConfirmRequest,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Confirm OTP reset by validating the temporary OTP code
+    """
+    success, error = OTPResetService.confirm_user_otp_reset(
+        db=db,
+        user=current_user,
+        token_value=request.token,
+        otp_code=request.otp_code,
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error or "Could not confirm OTP reset",
+        )
+
+    return {
+        "message": "OTP updated successfully",
+    }
 
 
 # TODO: Implement remaining endpoints:

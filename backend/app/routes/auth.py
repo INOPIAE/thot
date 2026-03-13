@@ -261,6 +261,7 @@ async def login(
         current_language=user.current_language,
         corporate_number=user.corporate_number,
         corporate_approved=user.corporate_approved,
+        otp_enabled=user.otp_enabled,
         active=user.active,
         created_on=user.created_on,
         roles=user.get_roles(),

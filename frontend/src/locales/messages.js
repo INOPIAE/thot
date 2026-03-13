@@ -167,6 +167,7 @@ export const messages = {
       otpQrAlt: 'QR code for OTP setup',
       otpManualEntryLabel: 'Manual setup key',
       otpSetupHint: 'If scanning is not possible, enter the manual key in your app. Then continue with login.',
+      otpTemporaryCode: 'Temporary two-factor code',
     },
 
     // User Management
@@ -188,6 +189,17 @@ export const messages = {
       passwordRequirements: 'Password must be at least 10 characters with uppercase, lowercase, and numbers or special characters',
       passwordChanged: 'Your password has been changed successfully',
       pendingApproval: 'Pending Approval',
+      otpStatusEnabled: 'Two-factor authentication is active',
+      otpStatusDisabled: 'Two-factor authentication is not active',
+      setupOtp: 'Set up two-factor authentication',
+      changeOtp: 'Change two-factor authentication',
+      otpResetDescription: 'A temporary OTP secret is created first. Confirm one code from your authenticator app to replace the current OTP secret.',
+      otpResetStarted: 'Temporary OTP setup created. Scan the QR code or use the manual key, then confirm one generated code.',
+      otpResetConfirm: 'Confirm new two-factor authentication',
+      otpResetCodeLabel: 'Authenticator code',
+      otpResetSuccess: 'Two-factor authentication updated successfully',
+      otpResetCancel: 'Cancel temporary setup',
+      otpResetExpires: 'Temporary setup expires in {hours} hour(s).',
     },
 
     // Admin/Support
@@ -604,6 +616,7 @@ export const messages = {
       otpQrAlt: 'QR-Code für OTP-Einrichtung',
       otpManualEntryLabel: 'Manueller Einrichtungsschlüssel',
       otpSetupHint: 'Falls Scannen nicht möglich ist, tragen Sie den manuellen Schlüssel in der App ein. Melden Sie sich danach an.',
+      otpTemporaryCode: 'Temporärer Zwei-Faktor-Code',
     },
 
     // User Management
@@ -625,6 +638,17 @@ export const messages = {
       passwordRequirements: 'Das Passwort muss mindestens 10 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben sowie Zahlen oder Sonderzeichen enthalten',
       passwordChanged: 'Ihr Passwort wurde erfolgreich geändert',
       pendingApproval: 'Genehmigung ausstehend',
+      otpStatusEnabled: 'Zwei-Faktor-Authentifizierung ist aktiv',
+      otpStatusDisabled: 'Zwei-Faktor-Authentifizierung ist nicht aktiv',
+      setupOtp: 'Zwei-Faktor-Authentifizierung einrichten',
+      changeOtp: 'Zwei-Faktor-Authentifizierung ändern',
+      otpResetDescription: 'Zuerst wird ein temporäres OTP-Geheimnis erzeugt. Bestätigen Sie einen Code aus Ihrer Authenticator-App, damit das aktuelle OTP-Geheimnis ersetzt wird.',
+      otpResetStarted: 'Die temporäre OTP-Einrichtung wurde erstellt. Scannen Sie den QR-Code oder nutzen Sie den manuellen Schlüssel und bestätigen Sie danach einen erzeugten Code.',
+      otpResetConfirm: 'Neue Zwei-Faktor-Authentifizierung bestätigen',
+      otpResetCodeLabel: 'Authenticator-Code',
+      otpResetSuccess: 'Zwei-Faktor-Authentifizierung erfolgreich aktualisiert',
+      otpResetCancel: 'Temporäre Einrichtung verwerfen',
+      otpResetExpires: 'Die temporäre Einrichtung läuft in {hours} Stunde(n) ab.',
     },
 
     // Admin/Support

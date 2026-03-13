@@ -3,7 +3,6 @@
     <div class="profile-card">
       <h2>{{ $t('user.profile') }}</h2>
 
-      <!-- Success/Error Messages -->
       <div v-if="successMessage" class="alert alert-success">
         {{ successMessage }}
       </div>
@@ -11,10 +10,9 @@
         {{ errorMessage }}
       </div>
 
-      <!-- Profile Information Section -->
       <div class="profile-section">
         <h3>{{ $t('auth.accountInfo') }}</h3>
-        
+
         <div class="form-group">
           <label>{{ $t('common.username') }}</label>
           <input type="text" :value="profileData.username" readonly />
@@ -40,26 +38,25 @@
         </div>
       </div>
 
-      <!-- Account Settings Section -->
       <div class="profile-section">
         <h3>{{ $t('auth.personalInfo') }}</h3>
-        
+
         <div class="form-row">
           <div class="form-group">
             <label for="firstName">{{ $t('common.firstName') }}</label>
-            <input 
-              v-model="editData.first_name" 
-              type="text" 
+            <input
               id="firstName"
+              v-model="editData.first_name"
+              type="text"
               @focus="clearMessages"
             />
           </div>
           <div class="form-group">
             <label for="lastName">{{ $t('common.lastName') }}</label>
-            <input 
-              v-model="editData.last_name" 
-              type="text" 
+            <input
               id="lastName"
+              v-model="editData.last_name"
+              type="text"
               @focus="clearMessages"
             />
           </div>
@@ -67,13 +64,13 @@
 
         <div class="form-group">
           <label for="language">{{ $t('common.language') }}</label>
-          <select v-model="editData.current_language" id="language">
+          <select id="language" v-model="editData.current_language">
             <option value="en">English</option>
             <option value="de">Deutsch</option>
           </select>
         </div>
 
-        <button 
+        <button
           @click="saveProfileChanges"
           :disabled="isLoading || !hasProfileChanges"
           class="btn-primary"
@@ -82,17 +79,16 @@
         </button>
       </div>
 
-      <!-- Password Change Section -->
       <div class="profile-section password-section">
         <h3>{{ $t('user.changePassword') }}</h3>
 
         <div class="form-group">
           <label for="currentPassword">{{ $t('user.currentPassword') }}</label>
           <div class="password-input-wrapper">
-            <input 
-              v-model="passwordForm.current_password" 
-              :type="showCurrentPassword ? 'text' : 'password'" 
+            <input
               id="currentPassword"
+              v-model="passwordForm.current_password"
+              :type="showCurrentPassword ? 'text' : 'password'"
               @focus="clearMessages"
             />
             <button
@@ -129,10 +125,10 @@
           <div class="form-group">
             <label for="newPassword">{{ $t('user.newPassword') }}</label>
             <div class="password-input-wrapper">
-              <input 
-                v-model="passwordForm.new_password" 
-                :type="showNewPassword ? 'text' : 'password'" 
+              <input
                 id="newPassword"
+                v-model="passwordForm.new_password"
+                :type="showNewPassword ? 'text' : 'password'"
                 @input="updatePasswordValidation"
                 @focus="clearMessages"
               />
@@ -150,10 +146,10 @@
           <div class="form-group">
             <label for="newPasswordConfirm">{{ $t('user.confirmNewPassword') }}</label>
             <div class="password-input-wrapper">
-              <input 
-                v-model="passwordForm.new_password_confirm" 
-                :type="showConfirmPassword ? 'text' : 'password'" 
+              <input
                 id="newPasswordConfirm"
+                v-model="passwordForm.new_password_confirm"
+                :type="showConfirmPassword ? 'text' : 'password'"
                 @input="updatePasswordValidation"
                 @focus="clearMessages"
               />
@@ -170,13 +166,78 @@
           </div>
         </div>
 
-        <button 
+        <button
           @click="changePassword"
           :disabled="isLoading || !isPasswordFormValid"
           class="btn-primary"
         >
           {{ isLoading ? $t('common.loading') : $t('user.changePassword') }}
         </button>
+      </div>
+
+      <div class="profile-section otp-section">
+        <h3>{{ profileData.otp_enabled ? $t('user.changeOtp') : $t('user.setupOtp') }}</h3>
+
+        <p class="otp-status" :class="profileData.otp_enabled ? 'otp-status-enabled' : 'otp-status-disabled'">
+          {{ profileData.otp_enabled ? $t('user.otpStatusEnabled') : $t('user.otpStatusDisabled') }}
+        </p>
+        <p class="otp-description">{{ $t('user.otpResetDescription') }}</p>
+
+        <button
+          @click="startOtpReset"
+          :disabled="isOtpResetLoading"
+          class="btn-primary"
+        >
+          {{ isOtpResetLoading ? $t('common.loading') : (profileData.otp_enabled ? $t('user.changeOtp') : $t('user.setupOtp')) }}
+        </button>
+
+        <div v-if="hasPendingOtpReset" class="otp-reset-panel">
+          <p class="otp-expiry">{{ $t('user.otpResetExpires', { hours: otpResetForm.expires_in_hours }) }}</p>
+
+          <div v-if="otpResetForm.qr_code" class="otp-qr-block">
+            <img
+              :src="`data:image/png;base64,${otpResetForm.qr_code}`"
+              :alt="$t('auth.otpQrAlt')"
+              class="otp-qr-image"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="otpManualEntry">{{ $t('auth.otpManualEntryLabel') }}</label>
+            <input id="otpManualEntry" type="text" :value="otpResetForm.manual_entry" readonly />
+          </div>
+
+          <p class="otp-description">{{ $t('auth.otpSetupHint') }}</p>
+
+          <div class="form-group">
+            <label for="otpResetCode">{{ $t('user.otpResetCodeLabel') }}</label>
+            <input
+              id="otpResetCode"
+              v-model="otpResetForm.otp_code"
+              type="text"
+              inputmode="numeric"
+              maxlength="6"
+              @focus="clearMessages"
+            />
+          </div>
+
+          <div class="otp-reset-actions">
+            <button
+              @click="confirmOtpReset"
+              :disabled="isOtpResetLoading || otpResetForm.otp_code.length !== 6"
+              class="btn-primary"
+            >
+              {{ isOtpResetLoading ? $t('common.loading') : $t('user.otpResetConfirm') }}
+            </button>
+            <button
+              @click="resetOtpResetForm"
+              :disabled="isOtpResetLoading"
+              class="btn-secondary"
+            >
+              {{ $t('user.otpResetCancel') }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -200,6 +261,7 @@ export default defineComponent({
         current_language: 'en',
         corporate_number: '',
         corporate_approved: false,
+        otp_enabled: false,
       },
       editData: {
         first_name: '',
@@ -211,6 +273,13 @@ export default defineComponent({
         new_password: '',
         new_password_confirm: '',
       },
+      otpResetForm: {
+        token: '',
+        otp_code: '',
+        manual_entry: '',
+        qr_code: '',
+        expires_in_hours: null,
+      },
       passwordValidation: {
         hasMinLength: false,
         hasUpperLower: false,
@@ -220,6 +289,7 @@ export default defineComponent({
       successMessage: '',
       errorMessage: '',
       isLoading: false,
+      isOtpResetLoading: false,
       showCurrentPassword: false,
       showNewPassword: false,
       showConfirmPassword: false,
@@ -242,13 +312,16 @@ export default defineComponent({
         this.passwordValidation.passwordsMatch
       )
     },
+    hasPendingOtpReset() {
+      return Boolean(this.otpResetForm.token)
+    },
   },
   methods: {
     async loadProfile() {
       try {
         this.isLoading = true
         const response = await userApi.getProfile()
-        
+
         this.profileData = {
           username: response.username || '',
           email: response.email || '',
@@ -257,19 +330,18 @@ export default defineComponent({
           current_language: response.current_language || 'en',
           corporate_number: response.corporate_number || '',
           corporate_approved: response.corporate_approved || false,
+          otp_enabled: response.otp_enabled || false,
         }
 
-        // Initialize edit data with profile data
         this.editData = {
           first_name: this.profileData.first_name,
           last_name: this.profileData.last_name,
           current_language: this.profileData.current_language,
         }
-        
-        this.isLoading = false
       } catch (error) {
         this.errorMessage = this.$t('messages.loadingError')
         console.error('Error loading profile:', error)
+      } finally {
         this.isLoading = false
       }
     },
@@ -285,25 +357,23 @@ export default defineComponent({
           current_language: this.editData.current_language,
         })
 
-        // Update profile data and auth store
         this.profileData = {
           ...this.profileData,
           first_name: response.first_name,
           last_name: response.last_name,
           current_language: response.current_language,
+          otp_enabled: response.otp_enabled,
         }
 
         this.successMessage = this.$t('messages.saveSuccess')
-        
-        // Update auth store language if changed
+
         if (this.authStore.user) {
           this.authStore.user.current_language = response.current_language
         }
-
-        this.isLoading = false
       } catch (error) {
-        this.errorMessage = error.response?.data?.detail || this.$t('messages.saveSuccess')
+        this.errorMessage = error.response?.data?.detail || error.detail || this.$t('messages.serverError')
         console.error('Error updating profile:', error)
+      } finally {
         this.isLoading = false
       }
     },
@@ -313,13 +383,12 @@ export default defineComponent({
         this.clearMessages()
         this.isLoading = true
 
-        const response = await userApi.changePassword({
+        await userApi.changePassword({
           current_password: this.passwordForm.current_password,
           new_password: this.passwordForm.new_password,
           new_password_confirm: this.passwordForm.new_password_confirm,
         })
 
-        // Clear password form
         this.passwordForm = {
           current_password: '',
           new_password: '',
@@ -327,17 +396,69 @@ export default defineComponent({
         }
 
         this.successMessage = this.$t('user.passwordChanged')
-        this.isLoading = false
       } catch (error) {
-        this.errorMessage = error.response?.data?.detail || this.$t('messages.saveSuccess')
+        this.errorMessage = error.response?.data?.detail || error.detail || this.$t('messages.serverError')
         console.error('Error changing password:', error)
+      } finally {
         this.isLoading = false
+      }
+    },
+
+    async startOtpReset() {
+      try {
+        this.clearMessages()
+        this.isOtpResetLoading = true
+
+        const response = await userApi.startOTPReset()
+        this.otpResetForm = {
+          token: response.token,
+          otp_code: '',
+          manual_entry: response.otp_setup?.manual_entry || '',
+          qr_code: response.otp_setup?.qr_code || '',
+          expires_in_hours: response.expires_in_hours,
+        }
+
+        this.successMessage = this.$t('user.otpResetStarted')
+      } catch (error) {
+        this.errorMessage = error.response?.data?.detail || error.detail || this.$t('messages.serverError')
+      } finally {
+        this.isOtpResetLoading = false
+      }
+    },
+
+    async confirmOtpReset() {
+      try {
+        this.clearMessages()
+        this.isOtpResetLoading = true
+
+        await userApi.confirmOTPReset({
+          token: this.otpResetForm.token,
+          otp_code: this.otpResetForm.otp_code,
+        })
+
+        this.resetOtpResetForm()
+        await this.loadProfile()
+        this.successMessage = this.$t('user.otpResetSuccess')
+      } catch (error) {
+        this.errorMessage = error.response?.data?.detail || error.detail || this.$t('messages.serverError')
+      } finally {
+        this.isOtpResetLoading = false
+      }
+    },
+
+    resetOtpResetForm() {
+      this.otpResetForm = {
+        token: '',
+        otp_code: '',
+        manual_entry: '',
+        qr_code: '',
+        expires_in_hours: null,
       }
     },
 
     updatePasswordValidation() {
       const pwd = this.passwordForm.new_password
-      
+
       this.passwordValidation.hasMinLength = pwd.length >= 10 && pwd.length <= 60
       this.passwordValidation.hasUpperLower = /[a-z]/.test(pwd) && /[A-Z]/.test(pwd)
       this.passwordValidation.hasDigitOrSpecial = /[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)
@@ -351,7 +472,6 @@ export default defineComponent({
   },
 
   mounted() {
-    // Check if user is authenticated
     if (!this.authStore.isAuthenticated) {
       this.$router.push('/auth/login')
       return
@@ -395,7 +515,8 @@ h2 {
   padding-bottom: 0;
 }
 
-.password-section {
+.password-section,
+.otp-section {
   margin-top: 3rem;
   padding-top: 2rem;
   border-top: 2px solid #f0f0f0;
@@ -452,6 +573,7 @@ h3 {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
 label {
   display: block;
   margin-bottom: 0.5rem;
@@ -533,9 +655,20 @@ button {
   background-color: #45a049;
 }
 
-.btn-primary:disabled {
+.btn-primary:disabled,
+.btn-secondary:disabled {
   background-color: #cccccc;
+  color: #666;
   cursor: not-allowed;
+}
+
+.btn-secondary {
+  background-color: #eef2f6;
+  color: #243746;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #dde4ea;
 }
 
 .alert {
@@ -575,6 +708,53 @@ button {
   color: #e65100;
 }
 
+.otp-status {
+  margin: 0 0 1rem;
+  font-weight: 600;
+}
+
+.otp-status-enabled {
+  color: #2e7d32;
+}
+
+.otp-status-disabled {
+  color: #8a5800;
+}
+
+.otp-description,
+.otp-expiry {
+  color: #4e5d6c;
+}
+
+.otp-reset-panel {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid #d8e0e8;
+  border-radius: 8px;
+  background-color: #fafcfe;
+}
+
+.otp-qr-block {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.otp-qr-image {
+  width: 220px;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #d8e0e8;
+  background: white;
+  padding: 0.75rem;
+}
+
+.otp-reset-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 @media (max-width: 640px) {
   .profile-card {
     padding: 1.5rem;
@@ -591,4 +771,9 @@ button {
   h3 {
     font-size: 1rem;
   }
-}</style>
+
+  .otp-reset-actions {
+    flex-direction: column;
+  }
+}
+</style>

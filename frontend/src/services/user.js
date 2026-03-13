@@ -100,6 +100,33 @@ export const userService = {
   },
 
   /**
+   * Start OTP reset for current user
+   */
+  async startOTPReset() {
+    try {
+      const response = await api.post('/users/otp/reset')
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
+   * Confirm OTP reset for current user
+   */
+  async confirmOTPReset(data) {
+    try {
+      const response = await api.post('/users/otp/reset/confirm', {
+        token: data.token,
+        otp_code: data.otp_code,
+      })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
    * List users (admin/support)
    */
   async listUsers(skip = 0, limit = 10, filters = {}) {

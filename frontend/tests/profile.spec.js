@@ -6,12 +6,13 @@ import Profile from '@/views/user/Profile.vue'
 import userApi from '@/services/user'
 import { useAuthStore } from '@/stores/auth'
 
-// Mock the user API
 vi.mock('@/services/user', () => ({
   default: {
     getProfile: vi.fn(),
     updateProfile: vi.fn(),
     changePassword: vi.fn(),
+    startOTPReset: vi.fn(),
+    confirmOTPReset: vi.fn(),
   },
 }))
 
@@ -38,6 +39,9 @@ const messages = {
       digitOrSpecial: 'Digit or Special Character',
       characters: 'characters',
       passwordsMustMatch: 'Passwords must match',
+      otpQrAlt: 'QR code for OTP setup',
+      otpManualEntryLabel: 'Manual setup key',
+      otpSetupHint: 'Enter the manual key in your app and confirm a code.',
     },
     user: {
       profile: 'User Profile',
@@ -47,6 +51,17 @@ const messages = {
       confirmNewPassword: 'Confirm New Password',
       passwordChanged: 'Password changed successfully',
       pendingApproval: 'Pending Approval',
+      otpStatusEnabled: 'Two-factor authentication is active',
+      otpStatusDisabled: 'Two-factor authentication is not active',
+      setupOtp: 'Set up two-factor authentication',
+      changeOtp: 'Change two-factor authentication',
+      otpResetDescription: 'Temporary OTP reset description',
+      otpResetStarted: 'Temporary OTP setup created.',
+      otpResetConfirm: 'Confirm new two-factor authentication',
+      otpResetCodeLabel: 'Authenticator code',
+      otpResetSuccess: 'Two-factor authentication updated successfully',
+      otpResetCancel: 'Cancel temporary setup',
+      otpResetExpires: 'Temporary setup expires in {hours} hour(s).',
     },
     admin: {
       approveCorporate: 'Approve Membership Number',
@@ -54,6 +69,7 @@ const messages = {
     messages: {
       loadingError: 'Error loading data',
       saveSuccess: 'Changes saved successfully',
+      serverError: 'Server error',
     },
   },
 }
@@ -64,6 +80,46 @@ const i18n = createI18n({
   messages,
 })
 
+function authenticatedStore() {
+  const authStore = useAuthStore()
+  authStore.token = 'test-token'
+  authStore.user = {
+    id: '123',
+    username: 'testuser',
+    email: 'test@example.com',
+    roles: ['user'],
+    current_language: 'en',
+  }
+  return authStore
+}
+
+function buildProfile(overrides = {}) {
+  return {
+    username: 'testuser',
+    email: 'test@example.com',
+    first_name: 'Test',
+    last_name: 'User',
+    current_language: 'en',
+    corporate_number: '12345',
+    corporate_approved: false,
+    otp_enabled: false,
+    ...overrides,
+  }
+}
+
+function mountProfile() {
+  return mount(Profile, {
+    global: {
+      plugins: [i18n],
+      stubs: ['router-link'],
+      mocks: {
+        $router: { push: vi.fn() },
+        $route: { path: '/user/profile' },
+      },
+    },
+  })
+}
+
 describe('Profile.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -71,71 +127,20 @@ describe('Profile.vue', () => {
   })
 
   it('renders profile component', () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-    }
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile({ otp_enabled: true }))
 
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: false,
-    })
-
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     expect(wrapper.find('h2').text()).toContain('User Profile')
   })
 
   it('loads profile data on mount', async () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-    }
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile({ corporate_approved: true, otp_enabled: true }))
 
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: true,
-    })
-
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     await wrapper.vm.$nextTick()
+
     expect(userApi.getProfile).toHaveBeenCalled()
   })
 
@@ -144,7 +149,7 @@ describe('Profile.vue', () => {
     authStore.token = null
 
     const mockPush = vi.fn()
-    const wrapper = mount(Profile, {
+    mount(Profile, {
       global: {
         plugins: [i18n],
         stubs: ['router-link'],
@@ -159,39 +164,12 @@ describe('Profile.vue', () => {
   })
 
   it('validates password requirements', async () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-    }
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile())
 
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: false,
-    })
-
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     await wrapper.vm.$nextTick()
 
-    // Test password validation
     wrapper.vm.passwordForm.new_password = 'ValidPass123!@'
     wrapper.vm.passwordForm.new_password_confirm = 'ValidPass123!@'
     wrapper.vm.updatePasswordValidation()
@@ -203,36 +181,10 @@ describe('Profile.vue', () => {
   })
 
   it('rejects password that is too short', async () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-    }
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile())
 
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: false,
-    })
-
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     await wrapper.vm.$nextTick()
 
     wrapper.vm.passwordForm.new_password = 'Short1!'
@@ -242,36 +194,10 @@ describe('Profile.vue', () => {
   })
 
   it('detects when passwords do not match', async () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-    }
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile())
 
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: false,
-    })
-
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     await wrapper.vm.$nextTick()
 
     wrapper.vm.passwordForm.new_password = 'ValidPass123!@'
@@ -282,45 +208,11 @@ describe('Profile.vue', () => {
   })
 
   it('saves profile changes successfully', async () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-      current_language: 'en',
-    }
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile())
+    userApi.updateProfile.mockResolvedValue(buildProfile({ first_name: 'Updated', current_language: 'de' }))
 
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: false,
-    })
-
-    userApi.updateProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Updated',
-      last_name: 'User',
-      current_language: 'de',
-    })
-
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     await flushPromises()
 
     wrapper.vm.editData.first_name = 'Updated'
@@ -336,40 +228,11 @@ describe('Profile.vue', () => {
   })
 
   it('changes password successfully', async () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-    }
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile())
+    userApi.changePassword.mockResolvedValue({ message: 'Password changed successfully' })
 
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: false,
-    })
-
-    userApi.changePassword.mockResolvedValue({
-      message: 'Password changed successfully',
-    })
-
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     await wrapper.vm.$nextTick()
 
     wrapper.vm.passwordForm.current_password = 'OldPassword123!'
@@ -383,32 +246,14 @@ describe('Profile.vue', () => {
       new_password: 'NewPassword123!@',
       new_password_confirm: 'NewPassword123!@',
     })
-
     expect(wrapper.vm.passwordForm.current_password).toBe('')
     expect(wrapper.vm.passwordForm.new_password).toBe('')
     expect(wrapper.vm.passwordForm.new_password_confirm).toBe('')
   })
 
   it('displays error message on change password failure', async () => {
-    const authStore = useAuthStore()
-    authStore.token = 'test-token'
-    authStore.user = {
-      id: '123',
-      username: 'testuser',
-      email: 'test@example.com',
-      roles: ['user'],
-    }
-
-    userApi.getProfile.mockResolvedValue({
-      username: 'testuser',
-      email: 'test@example.com',
-      first_name: 'Test',
-      last_name: 'User',
-      current_language: 'en',
-      corporate_number: '12345',
-      corporate_approved: false,
-    })
-
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile())
     userApi.changePassword.mockRejectedValue({
       response: {
         data: {
@@ -417,17 +262,7 @@ describe('Profile.vue', () => {
       },
     })
 
-    const wrapper = mount(Profile, {
-      global: {
-        plugins: [i18n],
-        stubs: ['router-link'],
-        mocks: {
-          $router: { push: vi.fn() },
-          $route: { path: '/user/profile' },
-        },
-      },
-    })
-
+    const wrapper = mountProfile()
     await wrapper.vm.$nextTick()
 
     wrapper.vm.passwordForm.current_password = 'WrongPassword!'
@@ -437,5 +272,56 @@ describe('Profile.vue', () => {
     await wrapper.vm.changePassword()
 
     expect(wrapper.vm.errorMessage).toContain('Current password is incorrect')
+  })
+
+  it('starts otp reset successfully', async () => {
+    authenticatedStore()
+    userApi.getProfile.mockResolvedValue(buildProfile({ otp_enabled: true }))
+    userApi.startOTPReset.mockResolvedValue({
+      token: 'temporary-token',
+      expires_in_hours: 1,
+      otp_setup: {
+        manual_entry: 'ABCDEF123456',
+        qr_code: 'ZmFrZS1xcg==',
+      },
+    })
+
+    const wrapper = mountProfile()
+    await flushPromises()
+    await wrapper.vm.startOtpReset()
+
+    expect(userApi.startOTPReset).toHaveBeenCalled()
+    expect(wrapper.vm.otpResetForm.token).toBe('temporary-token')
+    expect(wrapper.text()).toContain('Temporary OTP setup created.')
+  })
+
+  it('confirms otp reset successfully', async () => {
+    authenticatedStore()
+    userApi.getProfile
+      .mockResolvedValueOnce(buildProfile({ otp_enabled: false }))
+      .mockResolvedValueOnce(buildProfile({ otp_enabled: true }))
+    userApi.confirmOTPReset.mockResolvedValue({
+      message: 'Two-factor authentication updated successfully',
+    })
+
+    const wrapper = mountProfile()
+    await flushPromises()
+
+    wrapper.vm.otpResetForm = {
+      token: 'temporary-token',
+      otp_code: '123456',
+      manual_entry: 'ABCDEF123456',
+      qr_code: 'ZmFrZS1xcg==',
+      expires_in_hours: 1,
+    }
+
+    await wrapper.vm.confirmOtpReset()
+
+    expect(userApi.confirmOTPReset).toHaveBeenCalledWith({
+      token: 'temporary-token',
+      otp_code: '123456',
+    })
+    expect(wrapper.vm.otpResetForm.token).toBe('')
+    expect(wrapper.vm.profileData.otp_enabled).toBe(true)
   })
 })
