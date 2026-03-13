@@ -61,6 +61,12 @@ const routes = [
     meta: { requiresAuth: false },
   },
   {
+    path: '/auth/otp-reset/confirm/:token',
+    name: 'OTPResetConfirm',
+    component: () => import('@/views/auth/OTPResetConfirm.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/user/profile',
     name: 'UserProfile',
     component: () => import('@/views/user/Profile.vue'),

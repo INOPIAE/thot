@@ -7,6 +7,7 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 ### Authentication & User Management
 - ✅ User Authentication with JWT tokens
 - ✅ Two-Factor Authentication (OTP)
+- ✅ OTP Reset via Email (User + Support initiated)
 - ✅ Role-Based Access Control (RBAC)
 - ✅ User Registration with Email Verification
 - ✅ Password Reset Functionality
@@ -195,6 +196,8 @@ CREATE DATABASE nlf_db_test OWNER nlf_user;
 - `POST /api/v1/auth/login` - Login user
 - `POST /api/v1/auth/password-reset` - Request password reset
 - `POST /api/v1/auth/password-reset/confirm/{token}` - Confirm password reset
+- `GET /api/v1/auth/otp-reset/confirm/{token}` - Validate support OTP reset link and return temporary OTP setup payload
+- `POST /api/v1/auth/otp-reset/confirm/{token}` - Confirm OTP reset with one OTP code
 
 ### User Profile
 - `GET /api/v1/users/profile` - Get user profile
@@ -206,6 +209,12 @@ CREATE DATABASE nlf_db_test OWNER nlf_user;
 - `GET /api/v1/users` - List users (with filtering and pagination)
 - `GET /api/v1/users/{id}` - Get user details
 - `PUT /api/v1/users/{id}` - Update user
+- `PUT /api/v1/users/{id}/password-reset` - Trigger password reset email (support/admin)
+- `PUT /api/v1/users/{id}/otp-reset` - Trigger OTP reset email (support/admin, 24h expiry by default)
+
+Notes:
+- User list/detail responses include `otp_enabled` so support can see whether OTP is configured.
+- Support-triggered OTP reset stores link tokens in `otp_reset_tokens` and follows the same confirmation flow as user OTP reset.
 
 ### Records Management
 - `GET /api/v1/records` - List records (with search and pagination)
@@ -245,6 +254,8 @@ SMTP_SERVER=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
 SMTP_PASSWORD=your-app-password
+USER_OTP_RESET_TOKEN_EXPIRE_HOURS=1
+SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS=24
 
 # Application Configuration
 APP_NAME=NLF Database

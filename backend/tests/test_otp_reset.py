@@ -9,6 +9,7 @@ import pyotp
 
 from app.models import Role, User, UserRole, OTPResetToken
 from app.utils import hash_password, create_access_token
+from config import config
 
 
 def _create_role(db, name: str) -> Role:
@@ -138,3 +139,53 @@ def test_user_cannot_confirm_otp_reset_with_invalid_code(client, db):
     db.refresh(user)
     assert token_entry.used is False
     assert user.otp_secret == previous_secret
+
+
+def test_support_can_start_otp_reset_for_user(client, db, monkeypatch):
+    _create_role(db, "user")
+    _create_role(db, "support")
+
+    monkeypatch.setattr(
+        "app.routes.users.email_service.send_otp_reset_email",
+        lambda **kwargs: True,
+    )
+
+    target_user = _create_user(db, "otp_target", "otp-target@example.com", "ValidPass123!", "user")
+    support_user = _create_user(db, "otp_support", "otp-support@example.com", "ValidPass123!", "support")
+
+    access_token = create_access_token(str(support_user.id))
+    response = client.put(
+        f"/api/v1/users/{target_user.id}/otp-reset",
+        headers={"Authorization": f"Bearer {access_token}", "Host": "localhost"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["expires_in_hours"] == config.SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS
+
+    token_entry = (
+        db.query(OTPResetToken)
+        .filter(
+            OTPResetToken.userid == target_user.id,
+            OTPResetToken.used.is_(False),
+        )
+        .first()
+    )
+    assert token_entry is not None
+    assert token_entry.token
+    assert token_entry.otp_token
+
+
+def test_regular_user_cannot_start_otp_reset_for_user(client, db):
+    _create_role(db, "user")
+
+    regular_user = _create_user(db, "otp_regular", "otp-regular@example.com", "ValidPass123!", "user")
+    target_user = _create_user(db, "otp_other", "otp-other@example.com", "ValidPass123!", "user")
+
+    access_token = create_access_token(str(regular_user.id))
+    response = client.put(
+        f"/api/v1/users/{target_user.id}/otp-reset",
+        headers={"Authorization": f"Bearer {access_token}", "Host": "localhost"},
+    )
+
+    assert response.status_code == 403

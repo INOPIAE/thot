@@ -23,6 +23,7 @@ from app.schemas import (
     OTPEnableRequest,
 )
 from app.services import UserService, RegistrationService, PasswordResetService
+from app.services.otp_reset_service import OTPResetService
 from app.utils import (
     create_access_token,
     decode_access_token,
@@ -373,6 +374,53 @@ async def confirm_password_reset(
 
     return {
         "message": "Password reset successfully"
+    }
+
+
+@router.get("/otp-reset/confirm/{token}")
+async def validate_otp_reset_token(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Validate OTP reset token and return temporary setup details
+    """
+    token_entry, otp_setup_data, error = OTPResetService.get_public_reset_payload(db, token)
+    if error or not token_entry or not otp_setup_data:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error or "Invalid OTP reset token",
+        )
+
+    return {
+        "message": "OTP reset token is valid",
+        "expires_at": token_entry.expires_at.isoformat(),
+        "otp_setup": otp_setup_data,
+    }
+
+
+@router.post("/otp-reset/confirm/{token}")
+async def confirm_otp_reset_token(
+    token: str,
+    request: OTPEnableRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Confirm OTP reset with token and one OTP code
+    """
+    success, error = OTPResetService.confirm_otp_reset_by_token(
+        db=db,
+        token_value=token,
+        otp_code=request.otp_code,
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error or "Could not confirm OTP reset",
+        )
+
+    return {
+        "message": "OTP updated successfully"
     }
 
 

@@ -136,6 +136,32 @@ export const authService = {
       throw error.response?.data || error
     }
   },
+
+  /**
+   * Validate OTP reset token
+   */
+  async validateOtpResetToken(token) {
+    try {
+      const response = await api.get(`/auth/otp-reset/confirm/${token}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
+   * Confirm OTP reset
+   */
+  async confirmOtpResetToken(token, otpCode) {
+    try {
+      const response = await api.post(`/auth/otp-reset/confirm/${token}`, {
+        otp_code: otpCode,
+      })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
 }
 
 export default authService

@@ -94,6 +94,7 @@
             <th>{{ $t('admin.corporateNumber') }}</th>
             <th>{{ $t('admin.corporateApproved') }}</th>
             <th>{{ $t('common.active') }}</th>
+            <th>{{ $t('admin.otpStatus') }}</th>
             <th>{{ $t('admin.userRoles') }}</th>
             <th>{{ $t('common.actions') }}</th>
           </tr>
@@ -126,6 +127,11 @@
               </div>
             </td>
             <td>
+              <span class="badge" :class="user.otp_enabled ? 'badge-success' : 'badge-danger'">
+                {{ user.otp_enabled ? $t('user.otpStatusEnabled') : $t('user.otpStatusDisabled') }}
+              </span>
+            </td>
+            <td>
               <div class="roles-cell">
                 <span v-if="!userRoles[user.id] || userRoles[user.id].length === 0" class="text-muted">-</span>
                 <span v-for="role in userRoles[user.id]" :key="role.user_role_id" class="badge badge-role">
@@ -139,6 +145,9 @@
               </button>
               <button class="btn btn-sm btn-warning" @click="startPasswordReset(user.id, user.username)">
                 {{ $t('admin.resetPassword') }}
+              </button>
+              <button class="btn btn-sm btn-secondary" @click="startOtpReset(user.id, user.username)">
+                {{ $t('admin.resetOtp') }}
               </button>
             </td>
           </tr>
@@ -221,6 +230,10 @@
           <div class="detail-field">
             <label>{{ $t('common.active') }}</label>
             <div>{{ selectedUserDetails.active ? $t('common.yes') : $t('common.no') }}</div>
+          </div>
+          <div class="detail-field">
+            <label>{{ $t('admin.otpStatus') }}</label>
+            <div>{{ selectedUserDetails.otp_enabled ? $t('user.otpStatusEnabled') : $t('user.otpStatusDisabled') }}</div>
           </div>
           <div class="detail-field">
             <label>{{ $t('common.createdOn') }}</label>
@@ -469,6 +482,22 @@ export default defineComponent({
         this.successMessage = this.$t('admin.passwordResetEmailSentWithName', { username })
       } catch (err) {
         this.error = err.message || this.$t('admin.passwordResetError')
+      }
+    },
+
+    async startOtpReset(userId, username) {
+      if (!confirm(this.$t('admin.confirmOtpReset', { username }))) {
+        return
+      }
+
+      try {
+        const response = await userService.startOtpReset(userId)
+        this.successMessage = this.$t('admin.otpResetEmailSentWithName', {
+          username,
+          hours: response.expires_in_hours,
+        })
+      } catch (err) {
+        this.error = err.message || this.$t('admin.otpResetError')
       }
     },
 

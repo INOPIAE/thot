@@ -277,6 +277,7 @@ class UserListResponse(BaseModel):
     email: str
     corporate_number: Optional[str]
     corporate_approved: bool
+    otp_enabled: bool
     active: bool
 
 

@@ -635,6 +635,10 @@ FEATURE_EMAIL_VERIFICATION_ENABLED = True
 FEATURE_CORPORATE_APPROVALS_ENABLED = True
 CLOSED_REGISTRATION = False
 
+# Reset token expiry (hours)
+USER_OTP_RESET_TOKEN_EXPIRE_HOURS = 1
+SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS = 24
+
 # Languages
 DEFAULT_LANGUAGE = "en"
 ```
@@ -831,7 +835,9 @@ Admins and support staff can:
 - View all registered users
 - Edit user details
 - Approve corporate memberships
+- See whether OTP is configured for each user (`otp_enabled`)
 - Reset user passwords
+- Start OTP reset via email (24h link validity by default)
 - Activate/deactivate accounts
 
 Access via: **Administration** → **User Management**

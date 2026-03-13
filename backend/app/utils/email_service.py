@@ -202,6 +202,71 @@ class EmailService:
         )
         return self.send_email(to_email, subject, html_content, plain_text)
 
+    def send_otp_reset_email(
+        self,
+        to_email: str,
+        username: str,
+        reset_link: str,
+        expiration_hours: int = 24,
+        language: str = "en",
+        initiated_by_support: bool = False,
+    ) -> bool:
+        """Send OTP reset email with link to token-confirm flow."""
+        content = {
+            "en": {
+                "subject": "Reset Your Two-Factor Authentication",
+                "title": "Two-Factor Authentication Reset",
+                "greeting": f"Hi {username},",
+                "message": "We received a request to reset your two-factor authentication. Click the link below to continue:",
+                "message_support": "Support initiated a reset of your two-factor authentication. Click the link below to continue:",
+                "button": "Reset Two-Factor Authentication",
+                "expiry": f"This link will expire in {expiration_hours} hour(s).",
+                "ignore": "If you did not request this change, please contact support.",
+                "plain_message": f"Please reset your two-factor authentication by visiting: {reset_link}",
+                "plain_support": f"Support initiated this two-factor reset. Please continue here: {reset_link}",
+            },
+            "de": {
+                "subject": "Zwei-Faktor-Authentifizierung zurücksetzen",
+                "title": "Zurücksetzen der Zwei-Faktor-Authentifizierung",
+                "greeting": f"Hallo {username},",
+                "message": "Wir haben eine Anfrage zum Zurücksetzen Ihrer Zwei-Faktor-Authentifizierung erhalten. Klicken Sie auf den folgenden Link, um fortzufahren:",
+                "message_support": "Der Support hat das Zurücksetzen Ihrer Zwei-Faktor-Authentifizierung gestartet. Klicken Sie auf den folgenden Link, um fortzufahren:",
+                "button": "Zwei-Faktor-Authentifizierung zurücksetzen",
+                "expiry": f"Dieser Link ist {expiration_hours} Stunde(n) gültig.",
+                "ignore": "Wenn Sie diese Änderung nicht angefordert haben, kontaktieren Sie bitte den Support.",
+                "plain_message": f"Bitte setzen Sie Ihre Zwei-Faktor-Authentifizierung hier zurück: {reset_link}",
+                "plain_support": f"Der Support hat diesen Zwei-Faktor-Reset gestartet. Bitte fahren Sie hier fort: {reset_link}",
+            },
+        }
+
+        lang = content.get(language, content["en"])
+        subject = lang["subject"]
+        body_message = lang["message_support"] if initiated_by_support else lang["message"]
+        plain_message = lang["plain_support"] if initiated_by_support else lang["plain_message"]
+
+        html_content = f"""
+        <html>
+            <body>
+                <h2>{lang["title"]}</h2>
+                <p>{lang["greeting"]}</p>
+                <p>{body_message}</p>
+                <p>
+                    <a href="{reset_link}" style="background-color: #1565C0; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
+                        {lang["button"]}
+                    </a>
+                </p>
+                <p>{lang["expiry"]}</p>
+                <p>{lang["ignore"]}</p>
+            </body>
+        </html>
+        """
+        plain_text = (
+            f"{lang['greeting']}\n\n"
+            f"{plain_message}\n\n"
+            f"{lang['expiry']}"
+        )
+        return self.send_email(to_email, subject, html_content, plain_text)
+
     def send_email_change_confirmation(
         self,
         to_email: str,

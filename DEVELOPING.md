@@ -844,6 +844,8 @@ const messages = {
 - `POST /api/v1/auth/login` - Login with username/password
 - `POST /api/v1/auth/password-reset` - Request password reset
 - `POST /api/v1/auth/password-reset/confirm/{token}` - Confirm password reset
+- `GET /api/v1/auth/otp-reset/confirm/{token}` - Validate support OTP reset link and return OTP setup payload
+- `POST /api/v1/auth/otp-reset/confirm/{token}` - Confirm OTP reset with one OTP code
 
 #### User Profile
 - `GET /api/v1/users/profile` - Get current user profile
@@ -856,8 +858,52 @@ const messages = {
 - `GET /api/v1/users` - List all users (with pagination and filters)
 - `GET /api/v1/users/{user_id}` - Get user details
 - `PUT /api/v1/users/{user_id}` - Update user (support/admin)
-- `POST /api/v1/users/{user_id}/password-reset` - Trigger password reset
+- `PUT /api/v1/users/{user_id}/password-reset` - Trigger password reset
+- `PUT /api/v1/users/{user_id}/otp-reset` - Trigger OTP reset email (support/admin)
 - `PUT /api/v1/users/{user_id}/roles` - Update user roles
+
+Notes:
+- User list and user detail responses include `otp_enabled` so support/admin can see whether OTP is configured.
+- Support OTP reset links are stored in `otp_reset_tokens` and default to 24h validity.
+
+#### End-to-End Example: Support-Triggered OTP Reset
+
+1. Support triggers OTP reset for a user:
+
+```bash
+curl -X PUT "http://localhost:8000/api/v1/users/{user_id}/otp-reset" \\
+  -H "Authorization: Bearer {support_token}"
+```
+
+2. User receives email and opens link:
+
+```text
+http://localhost:5173/auth/otp-reset/confirm/{token}
+```
+
+3. Frontend validates token and loads setup payload:
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/auth/otp-reset/confirm/{token}"
+```
+
+Expected response includes:
+- `expires_at`
+- `otp_setup.qr_code`
+- `otp_setup.manual_entry`
+
+4. User scans QR/manual key in authenticator app and submits one code:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/auth/otp-reset/confirm/{token}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"otp_code":"123456"}'
+```
+
+5. On success:
+- User's OTP secret is replaced with the temporary `otp_reset_tokens.otp_token`
+- `otp_enabled` is set to `true`
+- Token is marked as used and cannot be reused
 
 ### Records Management
 

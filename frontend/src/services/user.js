@@ -131,12 +131,25 @@ export const userService = {
    */
   async listUsers(skip = 0, limit = 10, filters = {}) {
     try {
-      const response = await api.get('/users', {
-        params: {
+      let params
+      if (typeof skip === 'object' && skip !== null) {
+        const options = skip
+        params = {
+          skip: options.skip ?? 0,
+          limit: options.limit ?? 10,
+          filter_username: options.filter_username,
+          filter_email: options.filter_email,
+        }
+      } else {
+        params = {
           skip,
           limit,
           ...filters,
-        },
+        }
+      }
+
+      const response = await api.get('/users', {
+        params,
       })
       return response.data
     } catch (error) {
@@ -174,6 +187,18 @@ export const userService = {
   async startPasswordReset(userId) {
     try {
       const response = await api.put(`/users/${userId}/password-reset`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
+   * Start OTP reset for user (admin/support)
+   */
+  async startOtpReset(userId) {
+    try {
+      const response = await api.put(`/users/${userId}/otp-reset`)
       return response.data
     } catch (error) {
       throw error.response?.data || error

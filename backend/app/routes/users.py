@@ -178,6 +178,7 @@ async def list_users(
             email=u.email,
             corporate_number=u.corporate_number,
             corporate_approved=u.corporate_approved,
+            otp_enabled=u.otp_enabled,
             active=u.active,
         )
         for u in users
@@ -276,6 +277,7 @@ async def get_user_detail(
         email=user.email,
         corporate_number=user.corporate_number,
         corporate_approved=user.corporate_approved,
+        otp_enabled=user.otp_enabled,
         active=user.active,
         created_on=user.created_on,
         last_modified_on=user.last_modified_on,
@@ -421,6 +423,47 @@ async def support_reset_user_password(
     return {
         "message": "Password reset email has been sent",
         "expires_in_hours": config.PASSWORD_RESET_TOKEN_EXPIRE_HOURS,
+    }
+
+
+@router.put("/{user_id}/otp-reset")
+async def support_reset_user_otp(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Start OTP reset process for a user (support/admin only)
+    """
+    if not (current_user.has_role("support") or current_user.has_role("admin")):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
+
+    user, token_entry, error = OTPResetService.start_support_otp_reset(
+        db=db,
+        user_id=user_id,
+    )
+    if error or not user or not token_entry:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error or "Could not start OTP reset",
+        )
+
+    reset_link = f"{config.FRONTEND_URL}/auth/otp-reset/confirm/{token_entry.token}"
+    email_service.send_otp_reset_email(
+        to_email=user.email,
+        username=user.username,
+        reset_link=reset_link,
+        expiration_hours=config.SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS,
+        language=user.current_language,
+        initiated_by_support=True,
+    )
+
+    return {
+        "message": "OTP reset email has been sent",
+        "expires_in_hours": config.SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS,
     }
 
 

@@ -69,6 +69,7 @@ class OTPResetService:
     def create_reset_token(
         db: Session,
         user: User,
+        expiration_hours: int,
     ) -> Tuple[Optional[OTPResetToken], Optional[dict], Optional[str]]:
         """Create a temporary OTP reset token and QR setup payload for a user"""
         try:
@@ -77,9 +78,7 @@ class OTPResetService:
 
             token_value = secrets.token_urlsafe(32)
             otp_secret = generate_otp_secret()
-            expires_at = datetime.now(timezone.utc) + timedelta(
-                hours=config.USER_OTP_RESET_TOKEN_EXPIRE_HOURS
-            )
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=expiration_hours)
 
             token_entry = OTPResetToken(
                 id=uuid.uuid4(),
@@ -103,6 +102,26 @@ class OTPResetService:
             db.rollback()
             logger.error(f"Error creating OTP reset token: {str(exc)}")
             return None, None, "An error occurred while preparing OTP reset"
+
+    @staticmethod
+    def get_public_reset_payload(
+        db: Session,
+        token_value: str,
+    ) -> Tuple[Optional[OTPResetToken], Optional[dict], Optional[str]]:
+        """Get setup payload for a valid reset token (used by public confirm flow)."""
+        token_entry, error = OTPResetService.get_valid_token(db, token_value)
+        if error or not token_entry:
+            return None, None, error or "Invalid OTP reset request"
+
+        user = db.query(User).filter(User.id == token_entry.userid).first()
+        if not user:
+            return None, None, "Invalid OTP reset request"
+
+        otp_setup_data = {
+            "qr_code": RegistrationService.generate_otp_qr_code(user.username, token_entry.otp_token),
+            "manual_entry": token_entry.otp_token,
+        }
+        return token_entry, otp_setup_data, None
 
     @staticmethod
     def get_valid_token(
@@ -147,26 +166,68 @@ class OTPResetService:
         if not user:
             return None, None, None, "User not found"
 
-        token_entry, otp_setup_data, error = OTPResetService.create_reset_token(db=db, user=user)
+        token_entry, otp_setup_data, error = OTPResetService.create_reset_token(
+            db=db,
+            user=user,
+            expiration_hours=config.USER_OTP_RESET_TOKEN_EXPIRE_HOURS,
+        )
         if error:
             return None, None, None, error
 
         return user, token_entry, otp_setup_data, None
 
     @staticmethod
-    def confirm_user_otp_reset(
+    def start_support_otp_reset(
         db: Session,
-        user: User,
+        user_id: str,
+    ) -> Tuple[Optional[User], Optional[OTPResetToken], Optional[str]]:
+        """Start OTP reset initiated by support/admin (24h expiry by default)."""
+        try:
+            user_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, AttributeError):
+            return None, None, "User not found"
+
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return None, None, "User not found"
+
+        token_entry, _, error = OTPResetService.create_reset_token(
+            db=db,
+            user=user,
+            expiration_hours=config.SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS,
+        )
+        if error:
+            return None, None, error
+
+        return user, token_entry, None
+
+    @staticmethod
+    def confirm_otp_reset_by_token(
+        db: Session,
         token_value: str,
         otp_code: str,
+        expected_user_id=None,
     ) -> Tuple[bool, Optional[str]]:
-        """Verify the temporary OTP code and replace the user's OTP secret"""
-        token_entry, error = OTPResetService.get_valid_token(db, token_value, user.id)
+        """Confirm OTP reset by token and code, optionally scoped to a specific user."""
+        token_entry, error = OTPResetService.get_valid_token(db, token_value)
         if error or not token_entry:
             return False, error or "Invalid OTP reset request"
 
+        if expected_user_id is not None:
+            try:
+                expected_uuid = uuid.UUID(expected_user_id) if isinstance(expected_user_id, str) else expected_user_id
+            except (ValueError, AttributeError):
+                return False, "Invalid OTP reset request"
+
+            if token_entry.userid != expected_uuid:
+                return False, "Invalid OTP reset request"
+
         if not RegistrationService.verify_otp_code(token_entry.otp_token, otp_code):
             return False, "The temporary OTP code is invalid"
+
+        user = db.query(User).filter(User.id == token_entry.userid).first()
+        if not user:
+            return False, "User not found"
 
         try:
             user.otp_secret = token_entry.otp_token
@@ -180,3 +241,18 @@ class OTPResetService:
             db.rollback()
             logger.error(f"Error confirming OTP reset: {str(exc)}")
             return False, "An error occurred while updating OTP"
+
+    @staticmethod
+    def confirm_user_otp_reset(
+        db: Session,
+        user: User,
+        token_value: str,
+        otp_code: str,
+    ) -> Tuple[bool, Optional[str]]:
+        """Verify the temporary OTP code and replace the user's OTP secret"""
+        return OTPResetService.confirm_otp_reset_by_token(
+            db=db,
+            token_value=token_value,
+            otp_code=otp_code,
+            expected_user_id=user.id,
+        )
