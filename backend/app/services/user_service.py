@@ -2,7 +2,7 @@
 User service for business logic
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple, List
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -51,7 +51,7 @@ class UserService:
             first_name=first_name,
             last_name=last_name,
             current_language=current_language,
-            created_on=datetime.utcnow(),
+            created_on=datetime.now(timezone.utc),
         )
 
         db.add(user)
@@ -121,7 +121,7 @@ class UserService:
                 grace_until = user.timestamp_last_successful_login + timedelta(
                     minutes=grace_period_minutes
                 )
-                if datetime.utcnow() < grace_until:
+                if datetime.now(timezone.utc).replace(tzinfo=None) < grace_until.replace(tzinfo=None):
                     return None, "Login temporarily locked. Please try again later"
 
         # Verify password
@@ -129,13 +129,13 @@ class UserService:
             user.unsuccessful_logins += 1
             # Update timestamp on first unsuccessful attempt
             if user.unsuccessful_logins == 1:
-                user.timestamp_last_successful_login = datetime.utcnow()
+                user.timestamp_last_successful_login = datetime.now(timezone.utc)
             db.commit()
             return None, "Invalid username or password"
 
         # Successful login
         user.unsuccessful_logins = 0
-        user.timestamp_last_successful_login = datetime.utcnow()
+        user.timestamp_last_successful_login = datetime.now(timezone.utc)
         db.commit()
         db.refresh(user)
         return user, ""
@@ -160,7 +160,7 @@ class UserService:
         if current_language is not None:
             user.current_language = current_language
 
-        user.last_modified_on = datetime.utcnow()
+        user.last_modified_on = datetime.now(timezone.utc)
         try:
             user.last_modified_by = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         except (ValueError, AttributeError):
@@ -187,7 +187,7 @@ class UserService:
             return False, error_msg
 
         user.hashed_password = hash_password(new_password)
-        user.last_modified_on = datetime.utcnow()
+        user.last_modified_on = datetime.now(timezone.utc)
         try:
             user.last_modified_by = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         except (ValueError, AttributeError):
@@ -208,13 +208,12 @@ class UserService:
 
         user.hashed_password = hash_password(new_password)
         user.unsuccessful_logins = 0
-        user.last_modified_on = datetime.utcnow()
+        user.last_modified_on = datetime.now(timezone.utc)
         try:
             user.last_modified_by = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         except (ValueError, AttributeError):
             user.last_modified_by = None
         db.commit()
-        return True, "Password reset successfully"
         return True, "Password reset successfully"
 
     @staticmethod
@@ -230,7 +229,7 @@ class UserService:
             return False, "Email already in use"
 
         user.email = new_email
-        user.last_modified_on = datetime.utcnow()
+        user.last_modified_on = datetime.now(timezone.utc)
         try:
             user.last_modified_by = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         except (ValueError, AttributeError):
@@ -248,7 +247,7 @@ class UserService:
         secret = generate_otp_secret()
         user.otp_secret = secret
         user.otp_enabled = True
-        user.last_modified_on = datetime.utcnow()
+        user.last_modified_on = datetime.now(timezone.utc)
         try:
             user.last_modified_by = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         except (ValueError, AttributeError):
@@ -265,7 +264,7 @@ class UserService:
 
         user.otp_secret = None
         user.otp_enabled = False
-        user.last_modified_on = datetime.utcnow()
+        user.last_modified_on = datetime.now(timezone.utc)
         try:
             user.last_modified_by = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
         except (ValueError, AttributeError):
@@ -314,7 +313,7 @@ class UserService:
         if active is not None:
             user.active = active
 
-        user.last_modified_on = datetime.utcnow()
+        user.last_modified_on = datetime.now(timezone.utc)
         try:
             user.last_modified_by = uuid.UUID(admin_id) if isinstance(admin_id, str) else admin_id
         except (ValueError, AttributeError):
@@ -428,7 +427,7 @@ class UserService:
             user_id=user_id_uuid,
             role_id=role_id_uuid,
             created_by=assigned_by_uuid,
-            created_on=datetime.utcnow(),
+            created_on=datetime.now(timezone.utc),
             active=True,
         )
         
@@ -478,7 +477,7 @@ class UserService:
         # Soft delete - set active to False and record who removed it
         user_role.active = False
         user_role.last_modified_by = removed_by_uuid
-        user_role.last_modified_on = datetime.utcnow()
+        user_role.last_modified_on = datetime.now(timezone.utc)
         
         db.commit()
         

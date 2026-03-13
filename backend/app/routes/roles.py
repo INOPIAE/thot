@@ -2,10 +2,12 @@
 Role routes for role management (admin only)
 """
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
 from app.models.role import Role
@@ -52,8 +54,7 @@ class RoleResponse(BaseModel):
     description: str | None = None
     active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RoleCreateRequest(BaseModel):
@@ -111,7 +112,15 @@ async def get_role(
             detail="Insufficient permissions. Admin role required.",
         )
 
-    role = db.query(Role).filter(Role.id == role_id).first()
+    try:
+        role_uuid = uuid.UUID(role_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role ID format",
+        )
+
+    role = db.query(Role).filter(Role.id == role_uuid).first()
     
     if not role:
         raise HTTPException(
@@ -188,7 +197,15 @@ async def update_role(
             detail="Insufficient permissions. Admin role required.",
         )
 
-    role = db.query(Role).filter(Role.id == role_id).first()
+    try:
+        role_uuid = uuid.UUID(role_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role ID format",
+        )
+
+    role = db.query(Role).filter(Role.id == role_uuid).first()
     
     if not role:
         raise HTTPException(
@@ -241,7 +258,15 @@ async def delete_role(
             detail="Insufficient permissions. Admin role required.",
         )
 
-    role = db.query(Role).filter(Role.id == role_id).first()
+    try:
+        role_uuid = uuid.UUID(role_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid role ID format",
+        )
+
+    role = db.query(Role).filter(Role.id == role_uuid).first()
     
     if not role:
         raise HTTPException(

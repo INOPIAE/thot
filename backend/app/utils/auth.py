@@ -4,7 +4,7 @@ Authentication utilities
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import pyotp
 import jwt
@@ -33,8 +33,9 @@ def create_access_token(user_id: str, expires_delta: Optional[timedelta] = None)
     if expires_delta is None:
         expires_delta = timedelta(minutes=config.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    expire = datetime.utcnow() + expires_delta
-    payload = {"sub": user_id, "exp": expire, "iat": datetime.utcnow()}
+    now_utc = datetime.now(timezone.utc)
+    expire = now_utc + expires_delta
+    payload = {"sub": user_id, "exp": expire, "iat": now_utc}
 
     encoded_jwt = jwt.encode(payload, config.SECRET_KEY, algorithm="HS256")
     return encoded_jwt

@@ -2,7 +2,7 @@
 Tests for password reset flow
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.models import Role, User, UserRole, PasswordResetToken
@@ -15,7 +15,7 @@ def _create_role(db, name: str) -> Role:
         name=name,
         description=f"{name} role",
         active=True,
-        created_on=datetime.utcnow(),
+        created_on=datetime.now(timezone.utc),
     )
     db.add(role)
     db.commit()
@@ -32,7 +32,7 @@ def _create_user(db, username: str, email: str, password: str, role_name: str = 
         first_name="Test",
         last_name="User",
         current_language="en",
-        created_on=datetime.utcnow(),
+        created_on=datetime.now(timezone.utc),
     )
     db.add(user)
     db.commit()
@@ -52,13 +52,14 @@ def test_password_reset_request_uses_username(client, db, monkeypatch):
     _create_user(db, "alice", "alice@example.com", "ValidPass123!", "user")
 
     monkeypatch.setattr(
-        "app.utils.email_service.email_service.send_password_reset_email",
+        "app.routes.auth.email_service.send_password_reset_email",
         lambda *args, **kwargs: True,
     )
 
     response = client.post(
         "/api/v1/auth/password-reset",
         json={"username": "alice"},
+        headers={"Host": "localhost"},
     )
 
     assert response.status_code == 200
@@ -75,20 +76,24 @@ def test_password_reset_confirm_flow_updates_password_and_marks_used(client, db,
     user = _create_user(db, "bob", "bob@example.com", "ValidPass123!", "user")
 
     monkeypatch.setattr(
-        "app.utils.email_service.email_service.send_password_reset_email",
+        "app.routes.auth.email_service.send_password_reset_email",
         lambda *args, **kwargs: True,
     )
 
     request_response = client.post(
         "/api/v1/auth/password-reset",
         json={"username": "bob"},
+        headers={"Host": "localhost"},
     )
     assert request_response.status_code == 200
 
     token_entry = db.query(PasswordResetToken).filter(PasswordResetToken.userid == user.id).first()
     assert token_entry is not None
 
-    validate_response = client.get(f"/api/v1/auth/password-reset/confirm/{token_entry.token}")
+    validate_response = client.get(
+        f"/api/v1/auth/password-reset/confirm/{token_entry.token}",
+        headers={"Host": "localhost"},
+    )
     assert validate_response.status_code == 200
 
     confirm_response = client.post(
@@ -97,6 +102,7 @@ def test_password_reset_confirm_flow_updates_password_and_marks_used(client, db,
             "new_password": "NewValidPass456!",
             "new_password_confirm": "NewValidPass456!",
         },
+        headers={"Host": "localhost"},
     )
     assert confirm_response.status_code == 200
 
@@ -115,14 +121,14 @@ def test_support_can_start_password_reset_for_user(client, db, monkeypatch):
     target_user = _create_user(db, "charlie", "charlie@example.com", "ValidPass123!", "user")
 
     monkeypatch.setattr(
-        "app.utils.email_service.email_service.send_password_reset_email",
+        "app.routes.users.email_service.send_password_reset_email",
         lambda *args, **kwargs: True,
     )
 
     access_token = create_access_token(str(support_user.id))
     response = client.put(
         f"/api/v1/users/{target_user.id}/password-reset",
-        headers={"Authorization": f"Bearer {access_token}"},
+        headers={"Authorization": f"Bearer {access_token}", "Host": "localhost"},
     )
 
     assert response.status_code == 200

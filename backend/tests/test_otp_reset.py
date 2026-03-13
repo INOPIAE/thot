@@ -2,7 +2,7 @@
 Tests for OTP reset flow
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 import pyotp
@@ -17,7 +17,7 @@ def _create_role(db, name: str) -> Role:
         name=name,
         description=f"{name} role",
         active=True,
-        created_on=datetime.utcnow(),
+        created_on=datetime.now(timezone.utc),
     )
     db.add(role)
     db.commit()
@@ -36,7 +36,7 @@ def _create_user(db, username: str, email: str, password: str, role_name: str = 
         current_language="en",
         otp_secret=pyotp.random_base32(),
         otp_enabled=True,
-        created_on=datetime.utcnow(),
+        created_on=datetime.now(timezone.utc),
     )
     db.add(user)
     db.commit()

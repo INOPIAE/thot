@@ -20,6 +20,13 @@ class PasswordResetService:
     """Service for password reset token operations"""
 
     @staticmethod
+    def _normalize_timestamp(value: datetime) -> datetime:
+        """Ensure timestamps are timezone-aware before comparison."""
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+    @staticmethod
     def cleanup_expired_tokens(db: Session) -> int:
         """Delete expired password reset tokens"""
         try:
@@ -89,7 +96,7 @@ class PasswordResetService:
             if token_entry.used:
                 return None, "Password reset token has already been used"
 
-            if token_entry.expires_at <= datetime.now(timezone.utc):
+            if PasswordResetService._normalize_timestamp(token_entry.expires_at) <= datetime.now(timezone.utc):
                 db.delete(token_entry)
                 db.commit()
                 return None, "Invalid or expired password reset link"
@@ -151,6 +158,11 @@ class PasswordResetService:
         user_id: str,
     ) -> Tuple[Optional[User], Optional[PasswordResetToken], Optional[str]]:
         """Start password reset initiated by support/admin (24h expiry)"""
+        try:
+            user_id = uuid.UUID(user_id) if isinstance(user_id, str) else user_id
+        except (ValueError, AttributeError):
+            return None, None, "User not found"
+
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return None, None, "User not found"

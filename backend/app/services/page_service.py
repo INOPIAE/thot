@@ -5,7 +5,7 @@ Page service for handling page operations and file management
 import os
 import uuid
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -200,7 +200,7 @@ class PageService:
             page.restriction_id = restriction_id
         
         page.last_modified_by = user_id
-        page.last_modified_on = datetime.utcnow()
+        page.last_modified_on = datetime.now(timezone.utc)
         
         db.flush()
         return page
@@ -226,7 +226,7 @@ class PageService:
             # Soft delete in database
             page.active = False
             page.last_modified_by = user_id
-            page.last_modified_on = datetime.utcnow()
+            page.last_modified_on = datetime.now(timezone.utc)
             
             db.flush()
             return True

@@ -2,7 +2,7 @@
 Base model with common columns
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import uuid
 
@@ -21,7 +21,7 @@ class BaseModel(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     created_by = Column(UUID(as_uuid=True), nullable=True)
-    created_on = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    created_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     last_modified_by = Column(UUID(as_uuid=True), nullable=True)
     last_modified_on = Column(DateTime(timezone=True), nullable=True)
     active = Column(Boolean, default=True, nullable=False)

@@ -3,7 +3,7 @@ Tests for User Service
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timezone
 from app.services import UserService
 from app.models import User, Role, UserRole
 from app.utils import verify_password, hash_password
@@ -18,14 +18,14 @@ def setup_roles(db):
         name="admin",
         description="Admin role",
         active=True,
-        created_on=datetime.utcnow()
+        created_on=datetime.now(timezone.utc)
     )
     user_role = Role(
         id=uuid.uuid4(),
         name="user",
         description="User role",
         active=True,
-        created_on=datetime.utcnow()
+        created_on=datetime.now(timezone.utc)
     )
     db.add(admin_role)
     db.add(user_role)
@@ -211,7 +211,7 @@ def test_inactive_user_role_not_effective(db, setup_roles):
         user_id=user.id,
         role_id=admin_role.id,
         active=False,
-        created_on=datetime.utcnow(),
+        created_on=datetime.now(timezone.utc),
     )
     db.add(assignment)
     db.commit()

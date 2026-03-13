@@ -3,7 +3,7 @@ User Registration model
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, String, DateTime, UUID, Boolean
 
@@ -29,4 +29,6 @@ class UserRegistration(Base):
 
     def is_expired(self) -> bool:
         """Check if registration token has expired"""
-        return datetime.utcnow() > self.expires_at.replace(tzinfo=None) if self.expires_at.tzinfo else datetime.utcnow() > self.expires_at
+        expires_at = self.expires_at.replace(tzinfo=None) if self.expires_at.tzinfo else self.expires_at
+        now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+        return now_utc > expires_at

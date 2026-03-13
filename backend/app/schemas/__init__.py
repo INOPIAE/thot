@@ -3,7 +3,7 @@ Pydantic schemas for request/response validation
 """
 
 from __future__ import annotations
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 from uuid import UUID
@@ -101,8 +101,7 @@ class UserResponse(BaseModel):
     created_on: datetime
     roles: List[str] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserLoginResponse(BaseModel):
@@ -220,8 +219,7 @@ class RoleResponse(RoleBase):
     active: bool
     created_on: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserRoleAssignRequest(BaseModel):
@@ -262,8 +260,7 @@ class PermissionResponse(PermissionBase):
     active: bool
     created_on: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========================
@@ -350,8 +347,7 @@ class PageResponse(PageBase):
     last_modified_on: Optional[datetime]
     last_modified_by: Optional[UUID]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PageListResponse(BaseModel):

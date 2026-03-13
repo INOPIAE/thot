@@ -4,7 +4,7 @@ Pages API routes
 
 from pathlib import Path
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from fastapi.responses import Response
@@ -520,7 +520,7 @@ async def update_page(
         existing_page.restriction_id = restriction_id
         existing_page.workstatus_id = workstatus_id
         existing_page.last_modified_by = current_user.id
-        existing_page.last_modified_on = datetime.utcnow()
+        existing_page.last_modified_on = datetime.now(timezone.utc)
     
     # Handle file deletion
     if delete_file and existing_page.location_file:
@@ -584,7 +584,7 @@ async def delete_page(
     # Soft delete
     page.active = False
     page.last_modified_by = current_user.id
-    page.last_modified_on = datetime.utcnow()
+    page.last_modified_on = datetime.now(timezone.utc)
     
     db.commit()
     
