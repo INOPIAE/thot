@@ -53,15 +53,29 @@ def validate_file(file: UploadFile) -> None:
         )
 
 
-def save_uploaded_file(file: UploadFile, record_id: str, page_id: str) -> str:
+def _build_signature_folder_name(record_signature: Optional[str], record_id: str) -> str:
+    """Create a filesystem-safe folder name from record signature."""
+    if record_signature:
+        normalized_signature = "_".join(record_signature.strip().split())
+        safe_signature = "".join(
+            char if char.isalnum() or char in {"_", "-"} else "_"
+            for char in normalized_signature
+        )
+        safe_signature = safe_signature.strip("_")
+        if safe_signature:
+            return safe_signature
+    return str(record_id)
+
+
+def save_uploaded_file(file: UploadFile, record_signature: Optional[str], record_id: str) -> str:
     """Save uploaded file to disk and return relative path"""
-    # Create directory structure: uploads/{record_id}/
-    record_dir = config.UPLOAD_DIRECTORY / str(record_id)
+    # Create directory structure: uploads/{signature_folder}/
+    signature_folder = _build_signature_folder_name(record_signature, record_id)
+    record_dir = config.UPLOAD_DIRECTORY / signature_folder
     record_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generate unique filename with original extension
-    file_ext = Path(file.filename).suffix
-    filename = f"{page_id}{file_ext}"
+    # Store uploaded PDFs with fixed naming convention.
+    filename = f"Seite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
     file_path = record_dir / filename
     
     # Save file
@@ -76,7 +90,7 @@ def save_uploaded_file(file: UploadFile, record_id: str, page_id: str) -> str:
         f.write(content)
     
     # Return relative path for database storage
-    return f"{record_id}/{filename}"
+    return f"{signature_folder}/{filename}"
 
 
 def delete_uploaded_file(location_file: str) -> None:
@@ -443,7 +457,7 @@ async def create_page(
     # Handle file upload if provided
     if file and file.filename:
         validate_file(file)
-        location_file = save_uploaded_file(file, record_id, str(new_page.id))
+        location_file = save_uploaded_file(file, record.signature, str(record.id))
         new_page.location_file = location_file
     
     db.commit()
@@ -553,7 +567,11 @@ async def update_page(
         if existing_page.location_file:
             delete_uploaded_file(existing_page.location_file)
         # Save new file
-        location_file = save_uploaded_file(file, str(existing_page.record_id), page_id)
+        location_file = save_uploaded_file(
+            file,
+            existing_page.record.signature if existing_page.record else None,
+            str(existing_page.record_id),
+        )
         existing_page.location_file = location_file
     
     db.commit()
