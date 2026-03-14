@@ -52,20 +52,22 @@
       </p>
       <p class="text-center mt-3">
         {{ $t('auth.noAccount') }}
-        <router-link to="/auth/register">{{ $t('common.register') }}</router-link>
+        <router-link v-if="showRegisterLink" to="/auth/register">{{ $t('common.register') }}</router-link>
       </p>
     </div>
   </div>
 </template>
 
 <script>
-import { defineComponent, reactive, ref } from 'vue'
+import { computed, defineComponent, reactive, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 
 export default defineComponent({
   name: 'Login',
   setup() {
     const authStore = useAuthStore()
+    const appStore = useAppStore()
     const form = reactive({
       username: '',
       password: '',
@@ -75,14 +77,19 @@ export default defineComponent({
     const sessionNotice = ref('')
     const isLoading = ref(false)
     const showPassword = ref(false)
+    const showRegisterLink = computed(
+      () => !(appStore.config?.features?.closedRegistration ?? false)
+    )
 
     return {
       authStore,
+      appStore,
       form,
       error,
       sessionNotice,
       isLoading,
       showPassword,
+      showRegisterLink,
     }
   },
   mounted() {
