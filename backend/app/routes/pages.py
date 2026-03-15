@@ -18,6 +18,7 @@ from app.models.page import Page
 from app.models.record import Record
 from app.models.restriction import Restriction
 from app.models.workstatus import WorkStatus
+from app.services.pdf_ocr_service import PdfOcrService
 from app.utils.auth import get_current_user
 from config import config
 
@@ -82,11 +83,17 @@ def _build_safe_page_filename(page_name: str) -> str:
     return f"{safe_name}.pdf"
 
 
-def _save_pdf_content(pdf_content: bytes, record_signature: Optional[str], record_id: str, filename: str) -> str:
+def _save_pdf_content(
+    pdf_content: bytes,
+    record_signature: Optional[str],
+    record_id: str,
+    filename: str,
+    storage_subdir: str = "origin",
+) -> str:
     """Persist PDF content and return the relative path used for storage."""
-    # Create directory structure: uploads/{signature_folder}/
+    # Create directory structure: uploads/{signature_folder}/{storage_subdir}/
     signature_folder = _build_signature_folder_name(record_signature, record_id)
-    record_dir = config.UPLOAD_DIRECTORY / signature_folder
+    record_dir = config.UPLOAD_DIRECTORY / signature_folder / storage_subdir
     record_dir.mkdir(parents=True, exist_ok=True)
 
     file_path = record_dir / filename
@@ -102,13 +109,13 @@ def _save_pdf_content(pdf_content: bytes, record_signature: Optional[str], recor
         f.write(pdf_content)
 
     # Return relative path for database storage
-    return f"{signature_folder}/{filename}"
+    return f"{signature_folder}/{storage_subdir}/{filename}"
 
 
 def save_uploaded_file(file: UploadFile, record_signature: Optional[str], record_id: str) -> str:
     """Save a single uploaded file to disk and return relative path."""
     filename = f"Seite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    return _save_pdf_content(file.file.read(), record_signature, record_id, filename)
+    return _save_pdf_content(file.file.read(), record_signature, record_id, filename, storage_subdir="origin")
 
 
 def _split_pdf_pages(pdf_content: bytes) -> list[bytes]:
@@ -170,7 +177,10 @@ def _serialize_page(page) -> dict:
         "page": page.page,
         "comment": page.comment,
         "record_id": str(page.record_id),
+        "orgin_file": page.orgin_file,
         "location_file": page.location_file,
+        "current_file": page.current_file,
+        "restriction_file": page.restriction_file,
         "restriction_id": str(page.restriction_id),
         "workstatus_id": str(page.workstatus_id) if page.workstatus_id else None,
         "created_on": page.created_on.isoformat() if page.created_on else None,
@@ -196,6 +206,23 @@ def delete_uploaded_file(location_file: str) -> None:
             file_path.unlink()
 
 
+def _get_preferred_pdf_file(page: Page) -> Optional[str]:
+    """Use searchable current_file when available, fallback to orgin_file."""
+    return page.current_file or page.location_file
+
+
+def _populate_current_file_from_origin(page: Page) -> None:
+    """Run OCR pipeline and persist current_file path on the page model."""
+    try:
+        ocr_result = PdfOcrService.process_origin_to_current(page.orgin_file)
+        page.current_file = ocr_result.current_file_relative_path
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process OCR pipeline for uploaded PDF: {str(exc)}",
+        )
+
+
 @router.get("/{page_id}/download-watermarked")
 async def download_watermarked_pdf(
     page_id: str,
@@ -211,13 +238,14 @@ async def download_watermarked_pdf(
             detail="Page not found",
         )
 
-    if not page.location_file:
+    pdf_file = _get_preferred_pdf_file(page)
+    if not pdf_file:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No PDF file available for this page",
         )
 
-    source_pdf_path = (config.UPLOAD_DIRECTORY / page.location_file).resolve()
+    source_pdf_path = (config.UPLOAD_DIRECTORY / pdf_file).resolve()
     if not source_pdf_path.exists() or not source_pdf_path.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -242,7 +270,7 @@ async def download_watermarked_pdf(
             detail=f"Failed to generate watermarked PDF: {str(exc)}",
         )
 
-    filename_stem = Path(page.location_file).stem
+    filename_stem = Path(pdf_file).stem
     download_name = f"{filename_stem}_watermarked.pdf"
 
     return Response(
@@ -270,13 +298,14 @@ async def view_watermarked_pdf(
             detail="Page not found",
         )
 
-    if not page.location_file:
+    pdf_file = _get_preferred_pdf_file(page)
+    if not pdf_file:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No PDF file available for this page",
         )
 
-    source_pdf_path = (config.UPLOAD_DIRECTORY / page.location_file).resolve()
+    source_pdf_path = (config.UPLOAD_DIRECTORY / pdf_file).resolve()
     if not source_pdf_path.exists() or not source_pdf_path.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -301,7 +330,7 @@ async def view_watermarked_pdf(
             detail=f"Failed to generate watermarked PDF: {str(exc)}",
         )
 
-    filename_stem = Path(page.location_file).stem
+    filename_stem = Path(pdf_file).stem
     view_name = f"{filename_stem}_watermarked.pdf"
 
     return Response(
@@ -330,13 +359,14 @@ async def get_thumbnail_with_watermark(
             detail="Page not found",
         )
 
-    if not page.location_file:
+    pdf_file = _get_preferred_pdf_file(page)
+    if not pdf_file:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No PDF file available for this page",
         )
 
-    source_pdf_path = (config.UPLOAD_DIRECTORY / page.location_file).resolve()
+    source_pdf_path = (config.UPLOAD_DIRECTORY / pdf_file).resolve()
     if not source_pdf_path.exists() or not source_pdf_path.is_file():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -573,7 +603,9 @@ async def create_page(
                 record.signature,
                 str(record.id),
                 _build_safe_page_filename(page_name),
+                storage_subdir="origin",
             )
+            _populate_current_file_from_origin(new_page)
             created_pages.append(new_page)
     else:
         new_page = Page(
@@ -597,7 +629,9 @@ async def create_page(
                 record.signature,
                 str(record.id),
                 f"Seite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                storage_subdir="origin",
             )
+            _populate_current_file_from_origin(new_page)
 
         created_pages.append(new_page)
 
@@ -710,6 +744,9 @@ async def update_page(
             )
         delete_uploaded_file(existing_page.location_file)
         existing_page.location_file = None
+        if existing_page.current_file:
+            delete_uploaded_file(existing_page.current_file)
+            existing_page.current_file = None
     
     # Handle file upload (replaces existing file)
     if file and file.filename:
@@ -736,8 +773,10 @@ async def update_page(
             existing_page.record.signature if existing_page.record else None,
             str(existing_page.record_id),
             filename,
+            storage_subdir="origin",
         )
         existing_page.location_file = location_file
+        _populate_current_file_from_origin(existing_page)
     
     db.commit()
     db.refresh(existing_page)
@@ -777,6 +816,11 @@ async def delete_page(
         )
     
     # Soft delete
+    if page.location_file:
+        delete_uploaded_file(page.location_file)
+    if page.current_file:
+        delete_uploaded_file(page.current_file)
+
     page.active = False
     page.last_modified_by = current_user.id
     page.last_modified_on = datetime.now(timezone.utc)

@@ -159,6 +159,17 @@ MAX_UPLOAD_SIZE=52428800
 # Leave empty for QR codes without logo
 # QR_CODE_LOGO_PATH=./assets/Logo_NLF_fregestellt_75x75.png
 
+# OCR Pipeline
+OCR_PIPELINE_ENABLED=true
+OCR_PIPELINE_REQUIRED=false
+OCR_LANGUAGES=deu+deu_latf+eng
+OCR_DPI=300
+OCRMY_PDF_BIN=ocrmypdf
+KRAKEN_BIN=kraken
+KRAKEN_ENABLED=true
+KRAKEN_MIN_HANDWRITING_PAGES=1
+KRAKEN_MIN_HANDWRITING_RATIO=0.5
+
 # Legal content HTML (language-specific, not committed to git)
 LEGAL_CONTENT_DIRECTORY=./legal_content
 LEGAL_IMPRINT_FILENAME_TEMPLATE=imprint.{lang}.html
@@ -168,6 +179,41 @@ LEGAL_TERMS_OF_SERVICE_FILENAME_TEMPLATE=terms-of-service.{lang}.html
 # Logging
 LOG_LEVEL=INFO
 ```
+
+### 4.5. OCR Toolchain Checklist (Windows)
+
+To create searchable PDFs in the current_file column, install these tools on Windows.
+
+1. Install Tesseract OCR
+  - Download installer: https://github.com/UB-Mannheim/tesseract/wiki
+  - During setup, include language packs for German and Fraktur (deu, deu_latf)
+  - Add Tesseract folder to PATH (example: C:\Program Files\Tesseract-OCR)
+  - Verify: tesseract --version
+
+2. Install Ghostscript
+  - Download: https://ghostscript.com/releases/gsdnld.html
+  - Add Ghostscript bin folder to PATH
+  - Verify: gswin64c -version
+
+3. Install OCRmyPDF in backend virtualenv
+  - Run: pip install ocrmypdf
+  - Verify: ocrmypdf --version
+
+4. Optional: install Kraken for handwriting-heavy pages
+  - Run: pip install kraken
+  - Verify: kraken -h
+
+5. Restart terminal / VS Code after PATH changes
+
+6. Quick backend check
+  - Run in backend venv:
+    - tesseract --list-langs
+    - ocrmypdf --version
+    - python -c "from config import config; print(config.get_ocrmypdf_binary())"
+
+Notes:
+- If OCRmyPDF is unavailable and OCR_PIPELINE_REQUIRED=false, current_file is still created as fallback copy.
+- For strict OCR-only behavior, set OCR_PIPELINE_REQUIRED=true.
 
 ### 5. (Optional) Configure Logo and Favicons
 

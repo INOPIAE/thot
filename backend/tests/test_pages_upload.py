@@ -124,19 +124,28 @@ def test_create_page_splits_multi_page_pdf_into_multiple_pages(client, db, tmp_p
     assert payload["created_count"] == 3
     assert [item["name"] for item in payload["items"]] == ["Seite 1", "Seite 2", "Seite 3"]
     assert [item["location_file"] for item in payload["items"]] == [
-        "My_Signature/Seite_1.pdf",
-        "My_Signature/Seite_2.pdf",
-        "My_Signature/Seite_3.pdf",
+        "My_Signature/origin/Seite_1.pdf",
+        "My_Signature/origin/Seite_2.pdf",
+        "My_Signature/origin/Seite_3.pdf",
+    ]
+    assert [item["current_file"] for item in payload["items"]] == [
+        "My_Signature/current/Seite_1_current.pdf",
+        "My_Signature/current/Seite_2_current.pdf",
+        "My_Signature/current/Seite_3_current.pdf",
     ]
 
     pages = db.query(Page).filter(Page.record_id == record.id, Page.active == True).order_by(Page.created_on.asc()).all()
     assert [page.name for page in pages] == ["Seite 1", "Seite 2", "Seite 3"]
 
     for expected_name in ["Seite_1.pdf", "Seite_2.pdf", "Seite_3.pdf"]:
-        file_path = tmp_path / "My_Signature" / expected_name
+        file_path = tmp_path / "My_Signature" / "origin" / expected_name
         assert file_path.exists()
         reader = PdfReader(str(file_path))
         assert len(reader.pages) == 1
+
+    for expected_name in ["Seite_1_current.pdf", "Seite_2_current.pdf", "Seite_3_current.pdf"]:
+        file_path = tmp_path / "My_Signature" / "current" / expected_name
+        assert file_path.exists()
 
 
 def test_create_page_single_pdf_keeps_single_page_behavior(client, db, tmp_path, monkeypatch):
@@ -163,8 +172,10 @@ def test_create_page_single_pdf_keeps_single_page_behavior(client, db, tmp_path,
     assert payload["split_pdf"] is False
     assert payload["created_count"] == 1
     assert payload["name"] == "Cover Page"
-    assert payload["location_file"].startswith("Single_Signature/Seite_")
+    assert payload["location_file"].startswith("Single_Signature/origin/Seite_")
     assert payload["location_file"].endswith(".pdf")
+    assert payload["current_file"].startswith("Single_Signature/current/Seite_")
+    assert payload["current_file"].endswith("_current.pdf")
 
     pages = db.query(Page).filter(Page.record_id == record.id, Page.active == True).all()
     assert len(pages) == 1
@@ -195,8 +206,8 @@ def test_create_page_splits_image_based_multi_page_pdf(client, db, tmp_path, mon
     assert payload["split_pdf"] is True
     assert payload["created_count"] == 2
     assert [item["location_file"] for item in payload["items"]] == [
-        "Scan_Signature/Seite_1.pdf",
-        "Scan_Signature/Seite_2.pdf",
+        "Scan_Signature/origin/Seite_1.pdf",
+        "Scan_Signature/origin/Seite_2.pdf",
     ]
 
 
@@ -222,7 +233,7 @@ def test_create_page_ignores_original_filename_special_characters(client, db, tm
     assert response.status_code == 200
     payload = response.json()
     assert payload["split_pdf"] is False
-    assert payload["location_file"].startswith("Special_Signature/Seite_")
+    assert payload["location_file"].startswith("Special_Signature/origin/Seite_")
     assert payload["location_file"].endswith(".pdf")
 
 
@@ -334,3 +345,64 @@ def test_update_page_rejects_multi_page_pdf(client, db, tmp_path, monkeypatch):
 
     assert update_response.status_code == 400
     assert "Only single-page PDFs are allowed" in update_response.json()["detail"]
+
+
+def test_e2e_current_file_is_set_on_create_and_update(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+
+    user = _create_user_with_role(db, "page_e2e_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="E2E Signature")
+
+    create_response = client.post(
+        "/api/v1/pages",
+        headers=_auth_headers_for_user(user),
+        data={
+            "name": "E2E Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("e2e-create.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert create_response.status_code == 200
+    created_payload = create_response.json()
+    page_id = created_payload["id"]
+    assert created_payload["location_file"].startswith("E2E_Signature/origin/")
+    assert created_payload["current_file"].startswith("E2E_Signature/current/")
+
+    create_origin_path = tmp_path / created_payload["location_file"]
+    create_current_path = tmp_path / created_payload["current_file"]
+    assert create_origin_path.exists()
+    assert create_current_path.exists()
+
+    update_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=_auth_headers_for_user(user),
+        data={
+            "name": "E2E Page Updated",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("e2e-update.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert update_response.status_code == 200
+    updated_payload = update_response.json()
+    assert updated_payload["location_file"].startswith("E2E_Signature/origin/")
+    assert updated_payload["current_file"].startswith("E2E_Signature/current/")
+
+    update_origin_path = tmp_path / updated_payload["location_file"]
+    update_current_path = tmp_path / updated_payload["current_file"]
+    assert update_origin_path.exists()
+    assert update_current_path.exists()
+
+    persisted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
+    assert persisted_page is not None
+    assert persisted_page.current_file == updated_payload["current_file"]

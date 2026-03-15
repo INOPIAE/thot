@@ -5,6 +5,7 @@ Supports both development/testing and production environments.
 
 import os
 import urllib.parse
+import shutil
 from datetime import timedelta
 from typing import Optional
 from pathlib import Path
@@ -116,8 +117,19 @@ class Config:
     ALLOWED_FILE_EXTENSIONS = [".pdf"]
     WATERMARK_IMAGE_PATH = os.getenv("WATERMARK_IMAGE_PATH", "")
 
-    # QR Code logo (optional, embedded centred at 72Ã—72 px)
+    # QR Code logo (optional, embedded centred at 72×72 px)
     QR_CODE_LOGO_PATH = os.getenv("QR_CODE_LOGO_PATH", "")
+
+    # OCR pipeline configuration
+    OCR_PIPELINE_ENABLED = os.getenv("OCR_PIPELINE_ENABLED", "true").lower() == "true"
+    OCR_PIPELINE_REQUIRED = os.getenv("OCR_PIPELINE_REQUIRED", "false").lower() == "true"
+    OCR_LANGUAGES = os.getenv("OCR_LANGUAGES", "deu+deu_latf+eng")
+    OCR_DPI = int(os.getenv("OCR_DPI", 300))
+    OCRMY_PDF_BIN = os.getenv("OCRMY_PDF_BIN", "ocrmypdf")
+    KRAKEN_BIN = os.getenv("KRAKEN_BIN", "kraken")
+    KRAKEN_ENABLED = os.getenv("KRAKEN_ENABLED", "true").lower() == "true"
+    KRAKEN_MIN_HANDWRITING_PAGES = int(os.getenv("KRAKEN_MIN_HANDWRITING_PAGES", 1))
+    KRAKEN_MIN_HANDWRITING_RATIO = float(os.getenv("KRAKEN_MIN_HANDWRITING_RATIO", 0.5))
 
     # Legal Content (HTML files are language-specific and loaded from filesystem)
     _DEFAULT_LEGAL_CONTENT_DIRECTORY = Path(__file__).parent / "legal_content"
@@ -160,6 +172,18 @@ class Config:
         if not image_path.is_absolute():
             image_path = (Path(__file__).parent / image_path).resolve()
         return image_path
+
+    @classmethod
+    def get_ocrmypdf_binary(cls) -> Optional[str]:
+        """Return OCRmyPDF binary path if available."""
+        value = (cls.OCRMY_PDF_BIN or "ocrmypdf").strip()
+        return shutil.which(value) or (value if Path(value).exists() else None)
+
+    @classmethod
+    def get_kraken_binary(cls) -> Optional[str]:
+        """Return Kraken binary path if available."""
+        value = (cls.KRAKEN_BIN or "kraken").strip()
+        return shutil.which(value) or (value if Path(value).exists() else None)
     
     @classmethod
     def ensure_upload_directory(cls):
