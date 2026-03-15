@@ -326,6 +326,11 @@ PDF storage behavior:
 - Single-page PDFs are stored as `Seite_yyyyMMdd_hhmmss.pdf`.
 - Multi-page PDFs are split into separate page entries and stored as `Seite_1.pdf`, `Seite_2.pdf`, etc.
 
+OCR processing logs:
+- The backend logs OCR runtime per file and per job.
+- After an upload batch is processed, a summary log shows processed file count and total duration.
+- Example: `Upload batch OCR complete. files=5 duration=312.4s record_id=6f9d...`
+
 ### Frontend (.env)
 ```env
 # Backend API Base URL (without /api/v1 suffix)

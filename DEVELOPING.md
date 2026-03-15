@@ -159,6 +159,23 @@ Fix:
 - Use fallback mode in development: `OCR_PIPELINE_REQUIRED=false`
 - Use strict mode only when OCR stack is fully installed: `OCR_PIPELINE_REQUIRED=true`
 
+### 6.1 OCR Laufzeit-Logging
+
+Beim Upload von PDFs schreibt das Backend jetzt am Ende der OCR-Verarbeitung
+zusammenfassende Laufzeitinformationen in das Log.
+
+Neue Log-Zeilen:
+- Pro Datei: `Finished OCR pipeline. duration=...s ...`
+- Pro OCR-Job: `Completed OCR job. duration=...s ...`
+- Pro Upload-Batch: `Upload batch OCR complete. files=... duration=...s record_id=...`
+
+Beispiel (mehrseitiger Upload):
+```text
+Upload batch OCR complete. files=5 duration=312.4s record_id=6f9d...
+```
+
+Damit ist direkt sichtbar, wie viele Dateien verarbeitet wurden und wie lange der Batch insgesamt gedauert hat.
+
 ---
 
 ## Application Configuration

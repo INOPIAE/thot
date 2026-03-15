@@ -1,14 +1,43 @@
 """Tests for page PDF upload handling."""
 
 from io import BytesIO
+from pathlib import Path
 import uuid
 
 from PIL import Image
 from pypdf import PdfReader, PdfWriter
+import pytest
 
 from app.models import Page, Record, Restriction, Role, User, UserRole, WorkStatus, WorkStatusArea
+from app.routes import pages as pages_routes
+from app.services.page_ocr_job_service import PageOcrJobService
+from app.services.pdf_ocr_service import PdfOcrService
 from app.utils import create_access_token, hash_password
 from config import config
+
+
+PAGE_NUMBER_SAMPLES_DIR = Path(__file__).parent / "fixtures" / "page_number_samples"
+
+
+@pytest.fixture(autouse=True)
+def inline_ocr_processing(monkeypatch, db):
+    def _run_ocr_inline(page_id: str, record_id: str | None = None) -> bool:
+        page = db.query(Page).filter(Page.id == uuid.UUID(str(page_id))).first()
+        assert page is not None
+
+        ocr_result = PdfOcrService.process_origin_to_current(
+            page.orgin_file,
+            import_id="test-inline-ocr",
+            page_id=page_id,
+            record_id=record_id,
+        )
+        page.current_file = ocr_result.current_file_relative_path
+        pages_routes._update_page_comment_with_detected_page_number(page)
+        db.commit()
+        return True
+
+    monkeypatch.setattr(config, "OCR_PIPELINE_ASYNC", False)
+    monkeypatch.setattr(PageOcrJobService, "schedule_page_ocr", _run_ocr_inline)
 
 
 def _create_user_with_role(db, username: str, role_name: str) -> User:
@@ -97,6 +126,37 @@ def _build_encrypted_pdf(page_count: int, password: str) -> bytes:
     buffer = BytesIO()
     writer.write(buffer)
     return buffer.getvalue()
+
+
+def test_create_page_returns_pending_ocr_status_when_processing_is_backgrounded(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ASYNC", True)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", True)
+    monkeypatch.setattr(config, "OCR_PIPELINE_REQUIRED", False)
+    monkeypatch.setattr(PageOcrJobService, "schedule_page_ocr", lambda page_id, record_id=None: False)
+
+    user = _create_user_with_role(db, "page_async_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Async Signature")
+
+    response = client.post(
+        "/api/v1/pages",
+        headers=_auth_headers_for_user(user),
+        data={
+            "name": "Async Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("async.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["current_file"] is None
+    assert payload["ocr_status"] == "pending"
+    assert payload["location_file"].startswith("Async_Signature/origin/")
 
 
 def test_create_page_splits_multi_page_pdf_into_multiple_pages(client, db, tmp_path, monkeypatch):
@@ -406,3 +466,295 @@ def test_e2e_current_file_is_set_on_create_and_update(client, db, tmp_path, monk
     persisted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
     assert persisted_page is not None
     assert persisted_page.current_file == updated_payload["current_file"]
+
+
+def test_create_page_sets_comment_with_detected_page_number(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+    monkeypatch.setattr(pages_routes, "_extract_page_number_from_pdf_text", lambda _: 42)
+
+    user = _create_user_with_role(db, "page_number_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Number Signature")
+
+    response = client.post(
+        "/api/v1/pages",
+        headers=_auth_headers_for_user(user),
+        data={
+            "name": "Numbered Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+            "comment": "Original comment",
+        },
+        files={
+            "file": ("numbered.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["comment"] == "Seite: 42"
+
+
+def test_create_page_sets_comment_when_page_number_not_found(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+    monkeypatch.setattr(pages_routes, "_extract_page_number_from_pdf_text", lambda _: None)
+
+    user = _create_user_with_role(db, "page_number_missing_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Missing Number Signature")
+
+    response = client.post(
+        "/api/v1/pages",
+        headers=_auth_headers_for_user(user),
+        data={
+            "name": "Number Missing Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("blank.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["comment"] == "Seite: nicht gefunden"
+
+
+def test_extract_page_number_prefers_book_when_configured(monkeypatch):
+    text = "Seite 77\n15"
+    monkeypatch.setattr(config, "OCR_PAGE_NUMBER_PRIORITY", "book,stamp")
+
+    result = pages_routes._extract_page_number_from_text(text)
+
+    assert result == 77
+
+
+def test_extract_page_number_prefers_stamp_when_configured(monkeypatch):
+    text = "Seite 77\n15"
+    monkeypatch.setattr(config, "OCR_PAGE_NUMBER_PRIORITY", "stamp,book")
+
+    result = pages_routes._extract_page_number_from_text(text)
+
+    assert result == 15
+
+
+def test_extract_page_number_supports_roman_book_numbers(monkeypatch):
+    text = "Page XII"
+    monkeypatch.setattr(config, "OCR_PAGE_NUMBER_PRIORITY", "book,stamp")
+
+    result = pages_routes._extract_page_number_from_text(text)
+
+    assert result == 12
+
+
+def test_extract_book_number_ignores_body_text_reference():
+    """'Seite X' buried in a sentence must not be returned as the page number."""
+    text = "Der Text verweist auf Seite 216 des nachfolgenden Bandes."
+
+    result = pages_routes._extract_book_page_number_from_text(text)
+
+    assert result is None
+
+
+def test_extract_book_number_accepts_isolated_seite_label():
+    """'Seite X' alone on its line must still be detected."""
+    text = "Einleitung\nSeite 5\nAbschnitt"
+
+    result = pages_routes._extract_book_page_number_from_text(text)
+
+    assert result == 5
+
+
+def test_extract_positional_page_number_finds_footer_number(tmp_path, monkeypatch):
+    """Visitor returns a standalone number in the footer zone → returned as page number."""
+    import pypdf
+
+    class _FakeMediaBox:
+        height = 842.0
+        width = 595.0
+        lower_left = (0.0, 0.0)
+        upper_right = (595.0, 842.0)
+
+    class _FakePage:
+        mediabox = _FakeMediaBox()
+
+        def extract_text(self, visitor_text=None):
+            if visitor_text:
+                # Body text at y ≈ 0.82 (middle/upper area)
+                visitor_text("Fließtext auf Seite 77 des Kapitels", None, [1, 0, 0, 1, 72, 690], None, None)
+                # Page number in footer at y ≈ 0.05
+                visitor_text("42", None, [1, 0, 0, 1, 500, 40], None, None)
+            return "Fließtext auf Seite 77 des Kapitels\n42"
+
+    class _FakeReader:
+        def __init__(self, path):
+            self.pages = [_FakePage()]
+
+    monkeypatch.setattr(pypdf, "PdfReader", _FakeReader)
+    monkeypatch.setattr("app.routes.pages.PdfReader", _FakeReader)
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+
+    pdf_path = tmp_path / "test.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    result = pages_routes._extract_positional_page_number_from_pdf("test.pdf")
+
+    assert result == 42
+
+
+def test_extract_positional_page_number_handles_digit_fragments(tmp_path, monkeypatch):
+    """OCRmyPDF emits each digit separately; '2','1','6' at same y must be read as 216."""
+    import pypdf
+
+    class _FakeMediaBox:
+        lower_left = (0.0, 0.0)
+        upper_right = (595.0, 842.0)
+
+    class _FakePage:
+        mediabox = _FakeMediaBox()
+
+        def extract_text(self, visitor_text=None):
+            if visitor_text:
+                # Three separate digit fragments in the footer zone
+                visitor_text("2", None, [1, 0, 0, 1, 490, 38], None, None)
+                visitor_text("1", None, [1, 0, 0, 1, 498, 38], None, None)
+                visitor_text("6", None, [1, 0, 0, 1, 506, 38], None, None)
+            return "216"
+
+    class _FakeReader:
+        def __init__(self, path):
+            self.pages = [_FakePage()]
+
+    monkeypatch.setattr(pypdf, "PdfReader", _FakeReader)
+    monkeypatch.setattr("app.routes.pages.PdfReader", _FakeReader)
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+
+    pdf_path = tmp_path / "test.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    result = pages_routes._extract_positional_page_number_from_pdf("test.pdf")
+
+    assert result == 216
+
+
+def test_extract_positional_page_number_prefers_right_footer_zone(tmp_path, monkeypatch):
+    """When footer has multiple numbers, right-footer stamp should win."""
+    import pypdf
+
+    class _FakeMediaBox:
+        lower_left = (0.0, 0.0)
+        upper_right = (595.0, 842.0)
+
+    class _FakePage:
+        mediabox = _FakeMediaBox()
+
+        def extract_text(self, visitor_text=None):
+            if visitor_text:
+                # Left/footer noise
+                visitor_text("12", None, [1, 0, 0, 1, 40, 35], None, None)
+                # Right/footer page number
+                visitor_text("216", None, [1, 0, 0, 1, 520, 35], None, None)
+            return "12\n216"
+
+    class _FakeReader:
+        def __init__(self, path):
+            self.pages = [_FakePage()]
+
+    monkeypatch.setattr(pypdf, "PdfReader", _FakeReader)
+    monkeypatch.setattr("app.routes.pages.PdfReader", _FakeReader)
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+
+    pdf_path = tmp_path / "test.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    result = pages_routes._extract_positional_page_number_from_pdf("test.pdf")
+
+    assert result == 216
+
+
+def test_extract_stamp_page_number_allows_punctuation():
+    """Standalone footer numbers wrapped in punctuation should still match."""
+    text = "... 216 ."
+
+    result = pages_routes._extract_stamp_page_number_from_text(text)
+
+    assert result == 216
+
+
+def test_extract_stamp_page_number_supports_zero_and_ocr_confusions():
+    """Right-footer stamps may be OCR'd as 000001 or 00000C and must still parse."""
+    assert pages_routes._extract_stamp_page_number_from_text("000001") == 1
+    assert pages_routes._extract_stamp_page_number_from_text("000003") == 3
+    assert pages_routes._extract_stamp_page_number_from_text("0 0 0 0 0 3") == 3
+    assert pages_routes._extract_stamp_page_number_from_text("00000C") == 0
+
+
+def test_extract_page_number_uses_image_footer_when_text_methods_fail(monkeypatch):
+    monkeypatch.setattr(pages_routes, "_extract_positional_page_number_from_pdf", lambda _: None)
+    monkeypatch.setattr(pages_routes, "_extract_page_number_from_pdf_image_footer", lambda _: 3)
+
+    result = pages_routes._extract_page_number_from_pdf_text("dummy.pdf")
+
+    assert result == 3
+
+
+def test_extract_page_number_prefers_image_footer_stamp_over_positional_result(monkeypatch):
+    """Zero-padded footer stamps should win over weaker positional OCR results."""
+    monkeypatch.setattr(pages_routes, "_extract_page_number_from_pdf_image_footer", lambda _: 3)
+    monkeypatch.setattr(pages_routes, "_extract_positional_page_number_from_pdf", lambda _: 2)
+
+    result = pages_routes._extract_page_number_from_pdf_text("dummy.pdf")
+
+    assert result == 3
+
+
+def test_page_number_fixture_manifest_matches_available_files():
+    """Keep the OCR sample fixture corpus stable when example PDFs are swapped."""
+    available_files = {pdf_file.name for pdf_file in PAGE_NUMBER_SAMPLES_DIR.glob("*.pdf")}
+
+    assert available_files == {
+        "scan_handwriting_right_bottom_stamp_expected_0.pdf",
+        "scan_handwriting_right_bottom_stamp_expected_1.pdf",
+        "scan_printed_right_bottom_stamp_expected_0.pdf",
+        "scan_printed_right_bottom_stamp_expected_2.pdf",
+        "scan_printed_right_bottom_stamp_expected_3.pdf",
+        "scan_right_bottom_expected_3.pdf",
+    }
+
+
+def test_extract_positional_page_number_skips_body_reference(tmp_path, monkeypatch):
+    """Body reference 'Seite 77' must not be returned; only the footer number wins."""
+    import pypdf
+
+    class _FakeMediaBox:
+        height = 842.0
+        width = 595.0
+        lower_left = (0.0, 0.0)
+        upper_right = (595.0, 842.0)
+
+    class _FakePage:
+        mediabox = _FakeMediaBox()
+
+        def extract_text(self, visitor_text=None):
+            if visitor_text:
+                # "Seite 77" in a body sentence at y ≈ 0.82 — must NOT match
+                visitor_text("Text der auf Seite 77 verweist.", None, [1, 0, 0, 1, 72, 690], None, None)
+            return "Text der auf Seite 77 verweist."
+
+    class _FakeReader:
+        def __init__(self, path):
+            self.pages = [_FakePage()]
+
+    monkeypatch.setattr(pypdf, "PdfReader", _FakeReader)
+    monkeypatch.setattr("app.routes.pages.PdfReader", _FakeReader)
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+
+    pdf_path = tmp_path / "test.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4 fake")
+
+    result = pages_routes._extract_positional_page_number_from_pdf("test.pdf")
+
+    assert result is None

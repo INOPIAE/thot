@@ -6,6 +6,11 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
 from io import BytesIO
+import logging
+import re
+import subprocess
+import tempfile
+import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
@@ -18,11 +23,13 @@ from app.models.page import Page
 from app.models.record import Record
 from app.models.restriction import Restriction
 from app.models.workstatus import WorkStatus
-from app.services.pdf_ocr_service import PdfOcrService
+from app.services.page_ocr_job_service import PageOcrJobService
+from app.services import pdf_ocr_service as pdf_ocr_module
 from app.utils.auth import get_current_user
 from config import config
 
 router = APIRouter(prefix="/pages", tags=["pages"])
+logger = logging.getLogger(__name__)
 
 ALLOWED_PDF_CONTENT_TYPES = {
     "application/pdf",
@@ -180,6 +187,7 @@ def _serialize_page(page) -> dict:
         "orgin_file": page.orgin_file,
         "location_file": page.location_file,
         "current_file": page.current_file,
+        "ocr_status": _get_ocr_status(page),
         "restriction_file": page.restriction_file,
         "restriction_id": str(page.restriction_id),
         "workstatus_id": str(page.workstatus_id) if page.workstatus_id else None,
@@ -211,11 +219,441 @@ def _get_preferred_pdf_file(page: Page) -> Optional[str]:
     return page.current_file or page.location_file
 
 
-def _populate_current_file_from_origin(page: Page) -> None:
-    """Run OCR pipeline and persist current_file path on the page model."""
+def _get_ocr_status(page: Page) -> str:
+    """Return derived OCR processing status for API responses."""
+    if not page.orgin_file:
+        return "not-applicable"
+    if page.current_file:
+        return "completed"
+    return "pending"
+
+
+def _extract_text_from_pdf_first_page(file_relative_path: Optional[str]) -> str:
+    """Extract text from the first PDF page for page-number detection."""
+    if not file_relative_path:
+        return ""
+
+    pdf_path = (config.UPLOAD_DIRECTORY / file_relative_path).resolve()
+    if not pdf_path.exists() or not pdf_path.is_file():
+        return ""
+
     try:
-        ocr_result = PdfOcrService.process_origin_to_current(page.orgin_file)
-        page.current_file = ocr_result.current_file_relative_path
+        reader = PdfReader(str(pdf_path))
+        if len(reader.pages) == 0:
+            return ""
+        return reader.pages[0].extract_text() or ""
+    except Exception:
+        return ""
+
+
+def _roman_to_int(roman: str) -> Optional[int]:
+    """Convert a roman numeral to integer, returning None on invalid input."""
+    if not roman:
+        return None
+
+    roman = roman.upper()
+    if not re.fullmatch(r"[IVXLCDM]+", roman):
+        return None
+
+    values = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+    total = 0
+    previous = 0
+    for char in reversed(roman):
+        value = values[char]
+        if value < previous:
+            total -= value
+        else:
+            total += value
+            previous = value
+
+    # Canonical round-trip validation.
+    if _int_to_roman(total) != roman:
+        return None
+    return total
+
+
+def _int_to_roman(number: int) -> str:
+    """Convert integer to roman numeral."""
+    if number <= 0:
+        return ""
+
+    symbols = [
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
+    ]
+    result = []
+    remainder = number
+    for value, symbol in symbols:
+        while remainder >= value:
+            result.append(symbol)
+            remainder -= value
+    return "".join(result)
+
+
+def _extract_book_page_number_from_text(text: str) -> Optional[int]:
+    """Extract likely book page number from OCR text."""
+    normalized_text = (text or "").replace("\r\n", "\n")
+    if not normalized_text.strip():
+        return None
+
+    def _check_line_isolated(m: re.Match) -> bool:
+        """Return True when the match dominates its line (≤ 10 other chars)."""
+        line_start = normalized_text.rfind("\n", 0, m.start()) + 1
+        line_end_raw = normalized_text.find("\n", m.end())
+        line_end = line_end_raw if line_end_raw != -1 else len(normalized_text)
+        line = normalized_text[line_start:line_end]
+        other = (line[: m.start() - line_start] + line[m.end() - line_start :]).strip()
+        return len(other) <= 10
+
+    # Strong label-based patterns — require the label to dominate its line so that
+    # body-text references like "auf Seite 216 des Bandes" are not mistaken for
+    # a page number in a header or footer.
+    for match in re.finditer(r"\b(?:seite|page|p\.?)[\s.:\-]*(\d{1,4})\b", normalized_text, flags=re.IGNORECASE):
+        number = int(match.group(1))
+        if 1 <= number <= 9999 and _check_line_isolated(match):
+            return number
+
+    for match in re.finditer(
+        r"\b(?:seite|page|p\.?)[\s.:\-]*([ivxlcdm]{1,8})\b",
+        normalized_text,
+        flags=re.IGNORECASE,
+    ):
+        roman_number = _roman_to_int(match.group(1))
+        if roman_number and 1 <= roman_number <= 9999 and _check_line_isolated(match):
+            return roman_number
+
+    # Common book notation: current/total.
+    for match in re.finditer(r"\b(\d{1,4})\s*/\s*\d{1,4}\b", normalized_text):
+        number = int(match.group(1))
+        if 1 <= number <= 9999:
+            return number
+
+    return None
+
+
+def _extract_stamp_page_number_from_text(text: str) -> Optional[int]:
+    """Extract likely stamped page number from OCR text."""
+    normalized_text = (text or "").replace("\r\n", "\n")
+    if not normalized_text.strip():
+        return None
+
+    def _normalize_numeric_token(token: str) -> Optional[int]:
+        cleaned = token.strip()
+        if not cleaned:
+            return None
+
+        translation = str.maketrans(
+            {
+                "O": "0",
+                "o": "0",
+                "D": "0",
+                "Q": "0",
+                "G": "0",
+                "C": "0",
+                "U": "0",
+                "I": "1",
+                "l": "1",
+                "|": "1",
+                "!": "1",
+            }
+        )
+        normalized = cleaned.translate(translation)
+        if not re.fullmatch(r"\d{1,6}", normalized):
+            return None
+
+        value = int(normalized.lstrip("0") or "0")
+        if 0 <= value <= 999:
+            return value
+        return None
+
+    for line in normalized_text.split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # Typical stamp: standalone number in footer/header.
+        pure_number = re.fullmatch(r"[\[(\-\s.,;:]*([0-9]{1,4})[\])\-\s.,;:]*", stripped)
+        if pure_number:
+            number = int(pure_number.group(1))
+            # Avoid matching years too aggressively in generic stamp mode.
+            if 0 <= number <= 999:
+                return number
+
+        roman_number = re.fullmatch(
+            r"[\[(\-\s.,;:]*([IVXLCDM]{1,8})[\])\-\s.,;:]*",
+            stripped,
+            flags=re.IGNORECASE,
+        )
+        if roman_number:
+            value = _roman_to_int(roman_number.group(1))
+            if value and 1 <= value <= 999:
+                return value
+
+        # Fallback for short footer/header lines that contain multiple numeric
+        # tokens (e.g. left noise + right page number). Prefer rightmost token.
+        letters = re.findall(r"[A-Za-zÄÖÜäöüß]", stripped)
+        allowed_ocr_letters = {"O", "o", "D", "Q", "G", "C", "U", "I", "l"}
+        if len(stripped) <= 20 and all(letter in allowed_ocr_letters for letter in letters):
+            numbers = re.findall(r"\b([0-9A-Za-z!|]{1,6})\b", stripped)
+            for token in reversed(numbers):
+                value = _normalize_numeric_token(token)
+                if value is not None:
+                    return value
+
+    return None
+
+
+def _parse_page_number_priority() -> list[str]:
+    """Read configurable source priority for page-number detection."""
+    raw_priority = (getattr(config, "OCR_PAGE_NUMBER_PRIORITY", "book,stamp") or "book,stamp").strip()
+    order = [token.strip().lower() for token in raw_priority.split(",") if token.strip()]
+
+    normalized: list[str] = []
+    for token in order:
+        if token not in {"book", "stamp"}:
+            continue
+        if token not in normalized:
+            normalized.append(token)
+
+    if "book" not in normalized:
+        normalized.append("book")
+    if "stamp" not in normalized:
+        normalized.append("stamp")
+    return normalized
+
+
+def _extract_page_number_from_pdf_text(file_relative_path: Optional[str]) -> Optional[int]:
+    """Extract page number from OCR output using positional zone detection and configurable source priority."""
+    image_footer = _extract_page_number_from_pdf_image_footer(file_relative_path)
+    if image_footer is not None:
+        return image_footer
+    # Positional detection is the next-best fallback when image-based stamp OCR
+    # cannot resolve a zero-padded footer stamp.
+    positional = _extract_positional_page_number_from_pdf(file_relative_path)
+    if positional is not None:
+        return positional
+    # Full-text fallback (for PDFs without readable position data).
+    text = _extract_text_from_pdf_first_page(file_relative_path)
+    return _extract_page_number_from_text(text)
+
+
+def _extract_page_number_from_pdf_image_footer(file_relative_path: Optional[str]) -> Optional[int]:
+    """Render the first page and OCR only the right footer as a last-resort stamp detector."""
+    if not file_relative_path:
+        return None
+
+    fitz = getattr(pdf_ocr_module, "fitz", None)
+    cv2 = getattr(pdf_ocr_module, "cv2", None)
+    np = getattr(pdf_ocr_module, "np", None)
+    if fitz is None or cv2 is None or np is None:
+        return None
+
+    tesseract_bin = config.get_tesseract_binary()
+    if not tesseract_bin:
+        return None
+
+    pdf_path = (config.UPLOAD_DIRECTORY / file_relative_path).resolve()
+    if not pdf_path.exists() or not pdf_path.is_file():
+        return None
+
+    try:
+        doc = fitz.open(pdf_path)
+        try:
+            if doc.page_count == 0:
+                return None
+            page = doc[0]
+            pix = page.get_pixmap(dpi=max(int(config.OCR_DPI), 300), alpha=False)
+        finally:
+            doc.close()
+
+        arr = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
+        if pix.n == 4:
+            gray = cv2.cvtColor(arr, cv2.COLOR_BGRA2GRAY)
+        else:
+            gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+
+        height, width = gray.shape
+        # Focus on the stamp area seen in the sample scans.
+        crop = gray[int(height * 0.78) :, int(width * 0.58) :]
+        if crop.size == 0:
+            return None
+
+        enlarged = cv2.resize(crop, None, fx=3.0, fy=3.0, interpolation=cv2.INTER_CUBIC)
+        blurred = cv2.GaussianBlur(enlarged, (3, 3), 0)
+        _, otsu = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        inv = cv2.bitwise_not(otsu)
+
+        candidates = [otsu, inv]
+        seen: set[int] = set()
+        with tempfile.TemporaryDirectory(prefix="nlf-page-number-") as tmp_dir:
+            for index, image in enumerate(candidates):
+                image_path = Path(tmp_dir) / f"footer_{index}.png"
+                if not cv2.imwrite(str(image_path), image):
+                    continue
+
+                cmd = [
+                    tesseract_bin,
+                    str(image_path),
+                    "stdout",
+                    "--psm",
+                    "7",
+                    "-c",
+                    "tessedit_char_whitelist=0123456789ODQGCUIl|!",
+                ]
+                completed = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="ignore",
+                    timeout=30,
+                )
+                output = (completed.stdout or "").strip()
+                value = _extract_stamp_page_number_from_text(output)
+                if value is not None and value not in seen:
+                    seen.add(value)
+                    return value
+        return None
+    except Exception:
+        return None
+
+
+def _extract_positional_page_number_from_pdf(file_relative_path: Optional[str]) -> Optional[int]:
+    """
+    Detect page number using PDF text positions via pypdf visitor.
+    Checks the right footer first (bottom 20 %, right 40 %), then whole footer/header.
+    Returns None when zones contain no recognisable page number or on any error.
+    """
+    if not file_relative_path:
+        return None
+    pdf_path = (config.UPLOAD_DIRECTORY / file_relative_path).resolve()
+    if not pdf_path.exists() or not pdf_path.is_file():
+        return None
+    try:
+        reader = PdfReader(str(pdf_path))
+        if not reader.pages:
+            return None
+        page = reader.pages[0]
+        x_min = float(page.mediabox.lower_left[0])
+        x_max = float(page.mediabox.upper_right[0])
+        y_min = float(page.mediabox.lower_left[1])
+        y_max = float(page.mediabox.upper_right[1])
+        width = x_max - x_min
+        height = y_max - y_min
+        if width == 0 or height == 0:
+            return None
+
+        raw: list[tuple[str, float, float]] = []
+
+        def visitor(text: str, cm, tm, fontdict, fontsize) -> None:
+            # tm can be None when called outside a text object
+            if text and text.strip() and tm is not None:
+                x_norm = (float(tm[4]) - x_min) / width
+                y_norm = (float(tm[5]) - y_min) / height
+                raw.append((text, y_norm, x_norm))
+
+        page.extract_text(visitor_text=visitor)
+
+        if not raw:
+            return None
+
+        # Group fragments at nearby y-positions (within 2 % of page height) into lines.
+        sorted_raw = sorted(raw, key=lambda s: (round(s[1], 4), s[2]))
+        lines: list[tuple[str, float, float]] = []
+        buf_chunks: list[tuple[float, str]] = [(sorted_raw[0][2], sorted_raw[0][0])]
+        buf_y = sorted_raw[0][1]
+        for txt, y, x in sorted_raw[1:]:
+            if abs(y - buf_y) > 0.02:
+                ordered = " ".join(text for _, text in sorted(buf_chunks, key=lambda c: c[0]))
+                max_x = max(chunk_x for chunk_x, _ in buf_chunks)
+                lines.append((ordered, buf_y, max_x))
+                buf_chunks = []
+                buf_y = y
+            buf_chunks.append((x, txt))
+        if buf_chunks:
+            ordered = " ".join(text for _, text in sorted(buf_chunks, key=lambda c: c[0]))
+            max_x = max(chunk_x for chunk_x, _ in buf_chunks)
+            lines.append((ordered, buf_y, max_x))
+
+        def _collapse_digit_fragments(s: str) -> str:
+            """OCRmyPDF emits every digit as a separate fragment; '2 1 6' → '216'."""
+            stripped = s.strip()
+            # Collapse only when all tokens are single digits, not for multi-number lines.
+            if re.fullmatch(r"(?:\d\s+)+\d", stripped):
+                return re.sub(r"\s+", "", stripped)
+            return s
+
+        right_footer_text = "\n".join(
+            _collapse_digit_fragments(t) for t, y, max_x in lines if y <= 0.20 and max_x >= 0.60
+        )
+        footer_text = "\n".join(_collapse_digit_fragments(t) for t, y, _ in lines if y <= 0.20)
+        header_text = "\n".join(_collapse_digit_fragments(t) for t, y, _ in lines if y >= 0.85)
+
+        for zone_text in (right_footer_text, footer_text, header_text):
+            if not zone_text.strip():
+                continue
+            num = _extract_stamp_page_number_from_text(zone_text)
+            if num is not None:
+                return num
+            num = _extract_book_page_number_from_text(zone_text)
+            if num is not None:
+                return num
+
+        return None
+    except Exception:
+        return None
+
+
+def _extract_page_number_from_text(text: str) -> Optional[int]:
+    """Extract page number from already extracted OCR text."""
+    if not text.strip():
+        return None
+
+    extractor_map = {
+        "book": _extract_book_page_number_from_text,
+        "stamp": _extract_stamp_page_number_from_text,
+    }
+
+    for source in _parse_page_number_priority():
+        extractor = extractor_map[source]
+        number = extractor(text)
+        if number is not None:
+            return number
+
+    return None
+
+
+def _update_page_comment_with_detected_page_number(page: Page) -> None:
+    """Write standardized page-number information to pages.comment."""
+    detected_number = _extract_page_number_from_pdf_text(page.current_file)
+    if detected_number is None:
+        page.comment = "Seite: nicht gefunden"
+        return
+
+    page.comment = f"Seite: {detected_number}"
+
+
+def _populate_current_file_from_origin(db: Session, page: Page) -> None:
+    """Run OCR inline or queue background OCR, then refresh page state."""
+    try:
+        completed_inline = PageOcrJobService.schedule_page_ocr(
+            page_id=str(page.id),
+            record_id=str(page.record_id) if page.record_id else None,
+        )
+        db.refresh(page)
+        if completed_inline:
+            db.refresh(page)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -453,6 +891,7 @@ async def list_pages(
                 "record_signature": page.record.signature if page.record else None,
                 "location_file": page.location_file,
                 "current_file": page.current_file,
+                "ocr_status": _get_ocr_status(page),
                 "restriction_file": page.restriction_file,
                 "location_thumbnail": page.location_thumbnail,
                 "location_file_watermark": page.location_file_watermark,
@@ -500,6 +939,7 @@ async def get_page(
         "record_signature": page.record.signature if page.record else None,
         "location_file": page.location_file,
         "current_file": page.current_file,
+        "ocr_status": _get_ocr_status(page),
         "restriction_file": page.restriction_file,
         "location_thumbnail": page.location_thumbnail,
         "location_file_watermark": page.location_file_watermark,
@@ -574,6 +1014,7 @@ async def create_page(
         pdf_pages = _split_pdf_pages(pdf_content)
 
     created_pages: list[Page] = []
+    pages_requiring_ocr: list[Page] = []
     should_split_pdf = len(pdf_pages) > 1
 
     if should_split_pdf:
@@ -605,7 +1046,7 @@ async def create_page(
                 _build_safe_page_filename(page_name),
                 storage_subdir="origin",
             )
-            _populate_current_file_from_origin(new_page)
+            pages_requiring_ocr.append(new_page)
             created_pages.append(new_page)
     else:
         new_page = Page(
@@ -631,13 +1072,23 @@ async def create_page(
                 f"Seite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
                 storage_subdir="origin",
             )
-            _populate_current_file_from_origin(new_page)
+            pages_requiring_ocr.append(new_page)
 
         created_pages.append(new_page)
 
     db.commit()
     for created_page in created_pages:
         db.refresh(created_page)
+    batch_start = time.monotonic()
+    for page_with_ocr in pages_requiring_ocr:
+        _populate_current_file_from_origin(db, page_with_ocr)
+    if pages_requiring_ocr:
+        logger.info(
+            "Upload batch OCR complete. files=%d duration=%.1fs record_id=%s",
+            len(pages_requiring_ocr),
+            time.monotonic() - batch_start,
+            record_id,
+        )
 
     if should_split_pdf:
         return {
@@ -656,6 +1107,7 @@ async def create_page(
         "orgin_file": new_page.orgin_file,
         "location_file": new_page.location_file,
         "current_file": new_page.current_file,
+        "ocr_status": _get_ocr_status(new_page),
         "restriction_file": new_page.restriction_file,
         "restriction_id": str(new_page.restriction_id),
         "workstatus_id": str(new_page.workstatus_id) if new_page.workstatus_id else None,
@@ -776,9 +1228,10 @@ async def update_page(
             storage_subdir="origin",
         )
         existing_page.location_file = location_file
-        _populate_current_file_from_origin(existing_page)
-    
     db.commit()
+    if file and file.filename:
+        db.refresh(existing_page)
+        _populate_current_file_from_origin(db, existing_page)
     db.refresh(existing_page)
     
     return {
@@ -791,6 +1244,7 @@ async def update_page(
         "orgin_file": existing_page.orgin_file,
         "location_file": existing_page.location_file,
         "current_file": existing_page.current_file,
+        "ocr_status": _get_ocr_status(existing_page),
         "restriction_file": existing_page.restriction_file,
         "restriction_id": str(existing_page.restriction_id),
         "workstatus_id": str(existing_page.workstatus_id) if existing_page.workstatus_id else None,

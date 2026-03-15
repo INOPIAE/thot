@@ -7,6 +7,7 @@ from .registration_service import RegistrationService
 from .password_reset_service import PasswordResetService
 from .otp_reset_service import OTPResetService
 from .pdf_ocr_service import PdfOcrService
+from .page_ocr_job_service import PageOcrJobService
 
 __all__ = [
 	"UserService",
@@ -14,4 +15,5 @@ __all__ = [
 	"PasswordResetService",
 	"OTPResetService",
 	"PdfOcrService",
+	"PageOcrJobService",
 ]

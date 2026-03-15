@@ -215,6 +215,16 @@ Notes:
 - If OCRmyPDF is unavailable and OCR_PIPELINE_REQUIRED=false, current_file is still created as fallback copy.
 - For strict OCR-only behavior, set OCR_PIPELINE_REQUIRED=true.
 
+OCR logging overview:
+- Per file: `Finished OCR pipeline. duration=...s ...`
+- Per OCR job: `Completed OCR job. duration=...s ...`
+- Per upload batch: `Upload batch OCR complete. files=... duration=...s record_id=...`
+
+Example:
+```text
+Upload batch OCR complete. files=3 duration=148.9s record_id=9b1a...
+```
+
 ### 5. (Optional) Configure Logo and Favicons
 
 ### 5a. Provide Legal HTML Content (Imprint, Data Protection, Terms of Service)

@@ -2,15 +2,18 @@
 Main FastAPI application
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 import logging
 from pathlib import Path
+from typing import AsyncIterator
 
 from config import config
 from app.database import Base, engine, get_db
+from app.services.page_ocr_job_service import PageOcrJobService
 
 # Configure logging
 logging.basicConfig(level=config.LOG_LEVEL)
@@ -19,12 +22,22 @@ logger = logging.getLogger(__name__)
 # NOTE: Do NOT create tables here. Use `python scripts/init_db.py` instead.
 # This prevents database connection attempts during app import.
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """Manage application lifecycle resources."""
+    try:
+        yield
+    finally:
+        PageOcrJobService.shutdown()
+
 # Create FastAPI app
 app = FastAPI(
     title=config.APP_NAME,
     version=config.APP_VERSION,
     description="RESTful API for NLF Database Management",
     terms_of_service=config.API_TERMS_OF_SERVICE_URL,
+    lifespan=lifespan,
 )
 
 # Add CORS middleware

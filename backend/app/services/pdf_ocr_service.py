@@ -11,9 +11,11 @@ Pipeline stages:
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -48,7 +50,67 @@ class PdfOcrService:
     """Service to generate searchable PDFs from origin files."""
 
     @staticmethod
-    def process_origin_to_current(origin_file_relative_path: Optional[str]) -> OcrPipelineResult:
+    def _log_context(import_id: Optional[str], page_id: Optional[str], record_id: Optional[str]) -> str:
+        """Build a stable log context string for OCR operations."""
+        return (
+            f"import_id={import_id or '-'} page_id={page_id or '-'} record_id={record_id or '-'}"
+        )
+
+    @staticmethod
+    def _is_known_pikepdf_check_failure(output: str) -> bool:
+        """Detect known OCRmyPDF/pikepdf incompatibility in postprocessing checks."""
+        text = (output or "").lower()
+        return "pikepdf._core.pdf" in text and "has no attribute 'check'" in text
+
+    @staticmethod
+    def _copy_origin_to_current(
+        origin_path: Path,
+        current_path: Path,
+        reason: str,
+        import_id: Optional[str] = None,
+        page_id: Optional[str] = None,
+        record_id: Optional[str] = None,
+    ) -> None:
+        """Copy original PDF to current path and emit a clear fallback log."""
+        shutil.copy2(origin_path, current_path)
+        logger.warning(
+            "OCR fallback active; copied original PDF to current_file. reason=%s origin=%s current=%s %s",
+            reason,
+            origin_path,
+            current_path,
+            PdfOcrService._log_context(import_id, page_id, record_id),
+        )
+
+    @staticmethod
+    def _build_ocr_subprocess_env(*binary_paths: Optional[str]) -> dict[str, str]:
+        """Build environment for OCR subprocess, extending PATH for configured binaries."""
+        env = dict(os.environ)
+        current_path = env.get("PATH", "")
+        path_parts = [part for part in current_path.split(os.pathsep) if part]
+
+        for binary in binary_paths:
+            if not binary:
+                continue
+
+            binary_path = Path(binary)
+            if not binary_path.exists() and not binary_path.is_absolute():
+                # Command names (resolved via PATH) do not contribute additional directories.
+                continue
+
+            directory = str(binary_path.resolve().parent)
+            if directory and directory not in path_parts:
+                path_parts.insert(0, directory)
+
+        env["PATH"] = os.pathsep.join(path_parts)
+        return env
+
+    @staticmethod
+    def process_origin_to_current(
+        origin_file_relative_path: Optional[str],
+        import_id: Optional[str] = None,
+        page_id: Optional[str] = None,
+        record_id: Optional[str] = None,
+    ) -> OcrPipelineResult:
         """Create a searchable PDF from orgin_file and return current_file path.
 
         If OCR dependencies are unavailable and OCR is not required,
@@ -74,8 +136,24 @@ class PdfOcrService:
         current_dir.mkdir(parents=True, exist_ok=True)
         current_path = current_dir / f"{origin_path.stem}_current.pdf"
 
+        logger.info(
+            "Starting OCR pipeline. origin=%s current=%s ocr_enabled=%s %s",
+            origin_path,
+            current_path,
+            config.OCR_PIPELINE_ENABLED,
+            PdfOcrService._log_context(import_id, page_id, record_id),
+        )
+        t0 = time.monotonic()
+
         if not config.OCR_PIPELINE_ENABLED:
-            shutil.copy2(origin_path, current_path)
+            PdfOcrService._copy_origin_to_current(
+                origin_path,
+                current_path,
+                "ocr-disabled",
+                import_id=import_id,
+                page_id=page_id,
+                record_id=record_id,
+            )
             rel_path = str(current_path.relative_to(config.UPLOAD_DIRECTORY)).replace("\\", "/")
             return OcrPipelineResult(rel_path, False, "ocr-disabled")
 
@@ -89,15 +167,37 @@ class PdfOcrService:
             if PdfOcrService._should_run_kraken(analysis_summary):
                 PdfOcrService._try_run_kraken_hook(preprocessed_pdf, tmp_dir_path)
 
-            used_ocr = PdfOcrService._run_ocrmypdf(preprocessed_pdf, current_path)
+            used_ocr = PdfOcrService._run_ocrmypdf(
+                preprocessed_pdf,
+                current_path,
+                import_id=import_id,
+                page_id=page_id,
+                record_id=record_id,
+            )
             if not used_ocr:
                 if config.OCR_PIPELINE_REQUIRED:
                     raise RuntimeError(
                         "OCR pipeline is required but OCRmyPDF is not available or failed."
                     )
-                shutil.copy2(origin_path, current_path)
+                PdfOcrService._copy_origin_to_current(
+                    origin_path,
+                    current_path,
+                    "ocr-unavailable-or-failed",
+                    import_id=import_id,
+                    page_id=page_id,
+                    record_id=record_id,
+                )
 
         rel_path = str(current_path.relative_to(config.UPLOAD_DIRECTORY)).replace("\\", "/")
+        logger.info(
+            "Finished OCR pipeline. duration=%.1fs origin=%s current=%s used_ocrmypdf=%s analysis=%s %s",
+            time.monotonic() - t0,
+            origin_path,
+            current_path,
+            used_ocr,
+            analysis_summary,
+            PdfOcrService._log_context(import_id, page_id, record_id),
+        )
         return OcrPipelineResult(rel_path, used_ocr, analysis_summary)
 
     @staticmethod
@@ -172,21 +272,56 @@ class PdfOcrService:
             doc.close()
 
     @staticmethod
-    def _run_ocrmypdf(input_pdf: Path, output_pdf: Path) -> bool:
+    def _run_ocrmypdf(
+        input_pdf: Path,
+        output_pdf: Path,
+        import_id: Optional[str] = None,
+        page_id: Optional[str] = None,
+        record_id: Optional[str] = None,
+    ) -> bool:
         """OCRmyPDF stage for generating searchable PDF."""
         ocrmypdf_bin = config.get_ocrmypdf_binary()
         if not ocrmypdf_bin:
-            logger.warning("OCRmyPDF binary not found, using fallback for current_file")
+            logger.warning(
+                "OCR fallback: missing OCRmyPDF binary. config_key=OCRMY_PDF_BIN configured_value=%r input=%s output=%s %s",
+                getattr(config, "OCRMY_PDF_BIN", "ocrmypdf"),
+                input_pdf,
+                output_pdf,
+                PdfOcrService._log_context(import_id, page_id, record_id),
+            )
             return False
+
+        tesseract_bin = config.get_tesseract_binary()
+        if not tesseract_bin:
+            logger.warning(
+                "OCR fallback: missing Tesseract binary. config_key=TESSERACT_BIN configured_value=%r input=%s output=%s %s",
+                getattr(config, "TESSERACT_BIN", "tesseract"),
+                input_pdf,
+                output_pdf,
+                PdfOcrService._log_context(import_id, page_id, record_id),
+            )
+            return False
+
+        ghostscript_bin = config.get_ghostscript_binary()
+        if not ghostscript_bin:
+            logger.warning(
+                "OCR fallback: missing Ghostscript binary. config_key=GS_BIN configured_value=%r input=%s output=%s %s",
+                getattr(config, "GS_BIN", "gs"),
+                input_pdf,
+                output_pdf,
+                PdfOcrService._log_context(import_id, page_id, record_id),
+            )
+            return False
+
+        unpaper_bin = config.get_unpaper_binary()
 
         cmd = [
             ocrmypdf_bin,
             "--skip-text",
             "--deskew",
-            "--clean",
             "--rotate-pages",
             "--optimize",
-            "1",
+            str(config.OCR_OPTIMIZE),
             "--jobs",
             "1",
             "-l",
@@ -195,22 +330,75 @@ class PdfOcrService:
             str(output_pdf),
         ]
 
+        if unpaper_bin:
+            # OCRmyPDF requires unpaper for --clean on Windows/Linux.
+            cmd.insert(3, "--clean")
+        else:
+            logger.info(
+                "OCRmyPDF optional dependency unavailable: unpaper. config_key=UNPAPER_BIN configured_value=%r input=%s output=%s; continuing without --clean %s",
+                getattr(config, "UNPAPER_BIN", "unpaper"),
+                input_pdf,
+                output_pdf,
+                PdfOcrService._log_context(import_id, page_id, record_id),
+            )
+
+        logger.info(
+            "Running OCRmyPDF. input=%s output=%s languages=%s clean_enabled=%s %s",
+            input_pdf,
+            output_pdf,
+            config.OCR_LANGUAGES,
+            bool(unpaper_bin),
+            PdfOcrService._log_context(import_id, page_id, record_id),
+        )
+
         try:
+            run_env = PdfOcrService._build_ocr_subprocess_env(
+                ocrmypdf_bin,
+                tesseract_bin,
+                ghostscript_bin,
+                unpaper_bin,
+            )
             run = subprocess.run(
                 cmd,
                 check=False,
                 capture_output=True,
                 text=True,
+                env=run_env,
             )
             if run.returncode != 0:
+                run_output = (run.stderr or run.stdout or "").strip()
+                if (
+                    output_pdf.exists()
+                    and output_pdf.stat().st_size > 0
+                    and PdfOcrService._is_known_pikepdf_check_failure(run_output)
+                ):
+                    logger.warning(
+                        "OCRmyPDF reported known pikepdf check incompatibility, but output PDF exists. Treating OCR result as usable. exit=%s input=%s output=%s details=%s %s",
+                        run.returncode,
+                        input_pdf,
+                        output_pdf,
+                        run_output,
+                        PdfOcrService._log_context(import_id, page_id, record_id),
+                    )
+                    return True
+
                 logger.warning(
-                    "OCRmyPDF failed (exit=%s): %s",
+                    "OCRmyPDF failed; falling back to original PDF. exit=%s input=%s output=%s details=%s %s",
                     run.returncode,
-                    (run.stderr or run.stdout or "").strip(),
+                    input_pdf,
+                    output_pdf,
+                    run_output,
+                    PdfOcrService._log_context(import_id, page_id, record_id),
                 )
                 return False
         except Exception as exc:
-            logger.warning("OCRmyPDF execution failed: %s", exc)
+            logger.warning(
+                "OCRmyPDF execution failed; falling back to original PDF. input=%s output=%s error=%s %s",
+                input_pdf,
+                output_pdf,
+                exc,
+                PdfOcrService._log_context(import_id, page_id, record_id),
+            )
             return False
 
         return output_pdf.exists() and output_pdf.stat().st_size > 0

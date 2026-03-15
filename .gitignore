@@ -85,3 +85,6 @@ Thumbs.db
 /backend/assets/Logo_NLF_weiß_75x75.png
 /backend/assets/Logo_NLF_fregestellt_75x75.png
 /frontend/coverage
+
+# Temporary OCR evaluation artifacts (generated during test runs)
+/backend/tests/fixtures/_tmp_ocr_eval*/
