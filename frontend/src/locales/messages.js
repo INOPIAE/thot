@@ -339,6 +339,14 @@ export const messages = {
       createSuccess: 'Object created successfully',
       updateSuccess: 'Object updated successfully',
       saveError: 'Failed to save object',
+      showQrCode: 'Show QR Code',
+      hideQrCode: 'Hide QR Code',
+      qrCodeTitle: 'Record QR Code',
+      qrCodeAlt: 'QR code for record link',
+      publicLinkLabel: 'Public link',
+      qrLoadError: 'Failed to load QR code',
+      resolvingPublicLink: 'Resolving public record link...',
+      publicLinkInvalid: 'Public link is invalid or no longer available.',
     },
 
     // Pages
@@ -799,6 +807,14 @@ export const messages = {
       createSuccess: 'Datensatz erfolgreich erstellt',
       updateSuccess: 'Datensatz erfolgreich aktualisiert',
       saveError: 'Fehler beim Speichern des Datensatzes',
+      showQrCode: 'QR-Code anzeigen',
+      hideQrCode: 'QR-Code ausblenden',
+      qrCodeTitle: 'QR-Code für Datensatz',
+      qrCodeAlt: 'QR-Code für Datensatzlink',
+      publicLinkLabel: 'Öffentlicher Link',
+      qrLoadError: 'QR-Code konnte nicht geladen werden',
+      resolvingPublicLink: 'Öffentlicher Datensatzlink wird aufgelöst...',
+      publicLinkInvalid: 'Der öffentliche Link ist ungültig oder nicht mehr verfügbar.',
     },
 
     // Pages

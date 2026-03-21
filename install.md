@@ -154,6 +154,11 @@ MAX_UPLOAD_SIZE=52428800
 # Path to logo image to include in PDF watermarks
 # WATERMARK_IMAGE_PATH=./assets/logo.png
 
+# QR code logo configuration (optional)
+# Embedded centered in record QR codes with 72x72 pixels
+# Leave empty for QR codes without logo
+# QR_CODE_LOGO_PATH=./assets/Logo_NLF_fregestellt_75x75.png
+
 # Legal content HTML (language-specific, not committed to git)
 LEGAL_CONTENT_DIRECTORY=./legal_content
 LEGAL_IMPRINT_FILENAME_TEMPLATE=imprint.{lang}.html
@@ -207,6 +212,10 @@ If you want to include your company logo in the application header and PDF water
    
    # Watermark logo path (for PDF overlay)
    WATERMARK_IMAGE_PATH=./assets/logo.png
+
+  # Optional logo inside record QR codes (72x72 px)
+  # Leave empty for QR codes without logo
+  QR_CODE_LOGO_PATH=./assets/Logo_NLF_fregestellt_75x75.png
    ```
 
 Logo specifications:
@@ -214,6 +223,11 @@ Logo specifications:
 - Formats: PNG (with alpha channel for transparency), JPEG, GIF
 - Logo is served via FastAPI's `/assets` static mount point
 - Frontend fetches logo URL from backend config endpoint
+
+QR logo specifications:
+- Embedded in record QR codes at exactly 72x72 pixels (centered)
+- Recommended format: PNG with transparency
+- If `QR_CODE_LOGO_PATH` is empty or invalid, QR codes are generated without logo
 
 #### Favicons
 

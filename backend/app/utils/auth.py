@@ -67,7 +67,8 @@ def generate_otp_secret() -> str:
 def verify_otp(secret: str, token: str) -> bool:
     """Verify an OTP token"""
     totp = pyotp.TOTP(secret)
-    return totp.verify(token)
+    # Accept one adjacent TOTP step to avoid false negatives around time-boundary rollover.
+    return totp.verify(token, valid_window=1)
 
 
 def get_otp_qr_code(secret: str, username: str, issuer: str = "NLF Database") -> str:

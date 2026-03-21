@@ -116,6 +116,9 @@ class Config:
     ALLOWED_FILE_EXTENSIONS = [".pdf"]
     WATERMARK_IMAGE_PATH = os.getenv("WATERMARK_IMAGE_PATH", "")
 
+    # QR Code logo (optional, embedded centred at 72×72 px)
+    QR_CODE_LOGO_PATH = os.getenv("QR_CODE_LOGO_PATH", "")
+
     # Legal Content (HTML files are language-specific and loaded from filesystem)
     _DEFAULT_LEGAL_CONTENT_DIRECTORY = Path(__file__).parent / "legal_content"
     LEGAL_CONTENT_DIRECTORY = Path(
@@ -138,6 +141,18 @@ class Config:
     def get_watermark_image_path(cls) -> Optional[Path]:
         """Return configured watermark image path (or None when disabled)."""
         value = (cls.WATERMARK_IMAGE_PATH or "").strip()
+        if not value:
+            return None
+
+        image_path = Path(value)
+        if not image_path.is_absolute():
+            image_path = (Path(__file__).parent / image_path).resolve()
+        return image_path
+
+    @classmethod
+    def get_qr_code_logo_path(cls) -> Optional[Path]:
+        """Return configured QR code logo path (or None when not set)."""
+        value = (cls.QR_CODE_LOGO_PATH or "").strip()
         if not value:
             return None
 

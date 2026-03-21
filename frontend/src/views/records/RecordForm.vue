@@ -3,6 +3,9 @@
     <div class="form-header">
       <h1>{{ isReadOnlyMode ? $t('common.view') : (isEditMode ? $t('records.editRecord') : $t('records.createRecord')) }}</h1>
       <div class="header-actions">
+        <button v-if="isEditMode" type="button" class="btn btn-info" @click="toggleQrCode" :disabled="qrLoading">
+          {{ showQrCode ? $t('records.hideQrCode') : $t('records.showQrCode') }}
+        </button>
         <router-link v-if="isEditMode" :to="`/records/${recordId}/pages-gallery`" class="btn btn-primary">
           {{ $t('pages.galleryTitle') }}
         </router-link>
@@ -28,6 +31,25 @@
     <!-- Error State -->
     <div v-if="error" class="alert alert-danger">
       {{ error }}
+    </div>
+
+    <div v-if="isEditMode && showQrCode" class="record-qr-section">
+      <h2>{{ $t('records.qrCodeTitle') }}</h2>
+
+      <div v-if="qrLoading" class="loading">{{ $t('common.loading') }}</div>
+      <div v-else-if="qrError" class="alert alert-danger">{{ qrError }}</div>
+
+      <div v-else-if="qrData" class="qr-content">
+        <img
+          :src="`data:image/png;base64,${qrData.qr_code}`"
+          :alt="$t('records.qrCodeAlt')"
+          class="record-qr-image"
+        />
+        <div class="qr-link">
+          <strong>{{ $t('records.publicLinkLabel') }}:</strong>
+          <a :href="qrData.public_url" target="_blank" rel="noopener noreferrer">{{ qrData.public_url }}</a>
+        </div>
+      </div>
     </div>
 
     <!-- Form -->
@@ -182,6 +204,10 @@ export default defineComponent({
       submitting: false,
       error: null,
       successMessage: null,
+      showQrCode: false,
+      qrLoading: false,
+      qrError: null,
+      qrData: null,
     }
   },
   computed: {
@@ -296,6 +322,23 @@ export default defineComponent({
         this.submitting = false
       }
     },
+
+    async toggleQrCode() {
+      this.showQrCode = !this.showQrCode
+      if (!this.showQrCode || this.qrData || this.qrLoading) {
+        return
+      }
+
+      this.qrLoading = true
+      this.qrError = null
+      try {
+        this.qrData = await recordService.getRecordQrCode(this.recordId)
+      } catch (err) {
+        this.qrError = err?.detail || this.$t('records.qrLoadError')
+      } finally {
+        this.qrLoading = false
+      }
+    },
   },
 })
 </script>
@@ -330,6 +373,37 @@ export default defineComponent({
   padding: 40px;
   font-size: 16px;
   color: #666;
+}
+
+.record-qr-section {
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fff;
+}
+
+.record-qr-section h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 20px;
+}
+
+.qr-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.record-qr-image {
+  width: 35mm;
+  height: 35mm;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.qr-link {
+  word-break: break-all;
 }
 
 .record-form {

@@ -109,6 +109,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/lit/:encodedId',
+    name: 'PublicRecordLink',
+    component: () => import('@/views/records/PublicRecordLink.vue'),
+    meta: { requiresAuth: false },
+  },
+  {
     path: '/records/:recordId/pages',
     name: 'PageList',
     component: () => import('@/views/records/PageList.vue'),

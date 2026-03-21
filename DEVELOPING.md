@@ -353,9 +353,18 @@ backend/assets/logo.png
 And set in `.env`:
 ```env
 WATERMARK_IMAGE_PATH=./assets/logo.png
+
+# Optional logo in record QR codes (centered, 72x72 px)
+# Leave empty for QR codes without logo
+QR_CODE_LOGO_PATH=./assets/Logo_NLF_fregestellt_75x75.png
 ```
 
 Supported formats: PNG, JPEG, GIF (PNG with transparency recommended)
+
+QR logo behavior:
+- Rendered centered in record QR codes with fixed 72x72 pixel size
+- Uses high QR error correction so the code remains scannable with the logo overlay
+- If `QR_CODE_LOGO_PATH` is not set or cannot be loaded, QR codes are returned without logo
 
 #### Backend Implementation
 

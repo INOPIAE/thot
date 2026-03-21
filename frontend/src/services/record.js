@@ -46,6 +46,30 @@ export const recordService = {
   },
 
   /**
+   * Get QR code details for a record.
+   */
+  async getRecordQrCode(recordId) {
+    try {
+      const response = await api.get(`/public-links/records/${recordId}/qr-code`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
+   * Resolve frontend public link token (/lit/:encodedId) to a record id.
+   */
+  async resolvePublicRecordLink(encodedId) {
+    try {
+      const response = await api.get(`/public-links/lit/${encodedId}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
    * Create a new record
    */
   async createRecord(data) {

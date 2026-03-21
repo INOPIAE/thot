@@ -294,6 +294,10 @@ MAX_UPLOAD_SIZE=52428800
 # Logo & Watermark Configuration
 # Logo URL is served via /assets static mount
 WATERMARK_IMAGE_PATH=./assets/logo.png
+
+# Optional logo embedded inside record QR codes (72x72 px)
+# Leave empty to generate QR codes without logo
+QR_CODE_LOGO_PATH=./assets/Logo_NLF_fregestellt_75x75.png
 ```
 
 ### Frontend (.env)
@@ -315,6 +319,7 @@ VITE_API_URL=https://api.yourdomain.com/api/v1
 **Important Notes:**
 - `LOGO_URL` is a URL path (e.g., `/assets/logo.png`), served via backend static mount
 - `WATERMARK_IMAGE_PATH` is a file system path (e.g., `./assets/logo.png`), relative to backend directory
+- `QR_CODE_LOGO_PATH` is a file system path for record QR codes (rendered centered at 72x72 px); if not set, QR codes are generated without logo
 - Frontend automatically fetches logo URL from backend config endpoint
 - Favicons are loaded dynamically from `/assets/favicons/` using `VITE_BACKEND_URL`
 
