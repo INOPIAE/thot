@@ -176,6 +176,25 @@ cd frontend
 npm run test
 ```
 
+## Pull Requests
+
+Das Repository enthält einen GitHub-Actions-Workflow unter [.github/workflows/pull-request-tests.yml](.github/workflows/pull-request-tests.yml), der bei jedem Pull Request automatisch ausführt:
+
+- Backend-Unittests mit `pytest`
+- Frontend-Unittests mit `vitest`
+
+Die Ergebnisse werden als Checks am Pull Request veröffentlicht.
+
+Damit fehlgeschlagene Tests das Mergen blockieren, muss in GitHub zusätzlich eine Branch Protection Rule für den Ziel-Branch gesetzt werden:
+
+1. Repository öffnen
+2. `Settings` -> `Branches`
+3. Branch Protection Rule für den Ziel-Branch anlegen oder bearbeiten, z. B. `main`
+4. `Require status checks to pass before merging` aktivieren
+5. Die Checks `Backend Tests` und `Frontend Tests` als required markieren
+
+Erst wenn beide Checks erfolgreich sind, lässt GitHub den Merge zu.
+
 ## Database
 
 ### Create Databases
