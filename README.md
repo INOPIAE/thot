@@ -20,8 +20,8 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 - ✅ Keyword Management for Names and Locations
 - ✅ Phonetic Search (Cologne Phonetic & Double Metaphone)
 - ✅ Pages Management with PDF Upload
-- ✅ **PDF Watermarking with User Information**
-- ✅ **Dynamic Thumbnail Generation with Watermarks**
+- ✅ PDF Watermarking with User Information (a)
+- ✅ Dynamic Thumbnail Generation with Watermarks  (a)
 - ✅ File Upload to Filesystem
 - ✅ Restriction & WorkStatus Management
 - ✅ Full-text Search and Filtering
@@ -42,8 +42,7 @@ Professional Database Management System with Vue.js Frontend and FastAPI Backend
 - Python 3.9+
 - Node.js 16+
 - PostgreSQL 12+
-- **PyMuPDF runtime support** (installed via `requirements.txt`)
-- Visual Studio Code
+- PyMuPDF runtime support (installed via `requirements.txt`) (a)
 
 ## Quick Start
 
@@ -178,22 +177,22 @@ npm run test
 
 ## Pull Requests
 
-Das Repository enthält einen GitHub-Actions-Workflow unter [.github/workflows/pull-request-tests.yml](.github/workflows/pull-request-tests.yml), der bei jedem Pull Request automatisch ausführt:
+This repository includes a GitHub Actions workflow at [.github/workflows/pull-request-tests.yml](.github/workflows/pull-request-tests.yml), which automatically runs on every pull request:
 
-- Backend-Unittests mit `pytest`
-- Frontend-Unittests mit `vitest`
+- Backend unit tests with `pytest`
+- Frontend unit tests with `vitest`
 
-Die Ergebnisse werden als Checks am Pull Request veröffentlicht.
+The results are published as checks on the pull request.
 
-Damit fehlgeschlagene Tests das Mergen blockieren, muss in GitHub zusätzlich eine Branch Protection Rule für den Ziel-Branch gesetzt werden:
+To block merging when tests fail, you also need to configure a branch protection rule in GitHub for the target branch:
 
-1. Repository öffnen
+1. Open the repository
 2. `Settings` -> `Branches`
-3. Branch Protection Rule für den Ziel-Branch anlegen oder bearbeiten, z. B. `main`
-4. `Require status checks to pass before merging` aktivieren
-5. Die Checks `Backend Tests` und `Frontend Tests` als required markieren
+3. Create or edit a branch protection rule for the target branch (for example, `main`)
+4. Enable `Require status checks to pass before merging`
+5. Mark the checks `Backend Tests` and `Frontend Tests` as required
 
-Erst wenn beide Checks erfolgreich sind, lässt GitHub den Merge zu.
+GitHub will allow merging only after both checks pass.
 
 ## Database
 
@@ -394,4 +393,4 @@ Your Company
 ---
 
 **Version:** 1.0.0  
-**Last Updated:** 2026-02-28
+**Last Updated:** 2026-03-23
