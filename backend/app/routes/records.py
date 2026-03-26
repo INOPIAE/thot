@@ -15,6 +15,14 @@ from pypdf import PdfReader, PdfWriter
 
 from app.database import get_db
 from app.models import Record, Restriction, WorkStatus, KeywordName, KeywordLocation, Page
+from app.schemas import (
+    RecordCreateRequest,
+    RecordUpdateRequest,
+    RecordResponse,
+    RecordListResponse,
+    RecordListItemResponse,
+    RecordReducedResponse,
+)
 from app.utils.auth import get_current_user
 from app.utils.phonetics import generate_phonetic_codes
 from config import config
@@ -91,7 +99,22 @@ def process_keywords(db: Session, keywords_string: str, keyword_model):
     return keywords
 
 
-@router.get("")
+def parse_optional_date(value: Optional[str], field_name: str):
+    """Parse optional ISO date string (YYYY-MM-DD) for date columns."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    try:
+        return datetime.strptime(str(value), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid {field_name}. Expected YYYY-MM-DD",
+        )
+
+
+@router.get("", response_model=RecordListResponse)
 async def list_records(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
@@ -157,25 +180,25 @@ async def list_records(
 
     return {
         "items": [
-            {
-                "id": str(record.id),
-                "title": record.title,
-                "description": record.description,
-                "signature": record.signature,
-                "comment": record.comment,
-                "restriction_id": str(record.restriction_id),
-                "restriction": record.restriction.name if record.restriction else None,
-                "workstatus_id": str(record.workstatus_id),
-                "workstatus": record.workstatus.status if record.workstatus else None,
-                "keywords_names": ", ".join(sorted([kw.name for kw in record.keywords_names])) if record.keywords_names else "",
-                "keywords_locations": ", ".join(sorted([kw.name for kw in record.keywords_locations])) if record.keywords_locations else "",
-                "created_on": record.created_on.isoformat() if record.created_on else None,
-                "created_by": str(record.created_by) if record.created_by else None,
-                "page_count": db.query(func.count(Page.id)).filter(
+            RecordListItemResponse(
+                id=record.id,
+                title=record.title,
+                description=record.description,
+                signature=record.signature,
+                comment=record.comment,
+                restriction_id=record.restriction_id,
+                restriction=record.restriction.name if record.restriction else None,
+                workstatus_id=record.workstatus_id,
+                workstatus=record.workstatus.status if record.workstatus else None,
+                keywords_names=", ".join(sorted([kw.name for kw in record.keywords_names])) if record.keywords_names else "",
+                keywords_locations=", ".join(sorted([kw.name for kw in record.keywords_locations])) if record.keywords_locations else "",
+                created_on=record.created_on,
+                created_by=record.created_by,
+                page_count=db.query(func.count(Page.id)).filter(
                     Page.record_id == record.id,
                     Page.active == True
                 ).scalar() or 0,
-            }
+            )
             for record in records
         ],
         "total": total,
@@ -184,7 +207,7 @@ async def list_records(
     }
 
 
-@router.get("/reduced")
+@router.get("/reduced", response_model=List[RecordReducedResponse])
 async def list_reduced_records(
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
@@ -201,17 +224,10 @@ async def list_reduced_records(
 
     records = query.order_by(Record.signature.asc(), Record.title.asc()).all()
 
-    return [
-        {
-            "id": str(record.id),
-            "name": record.title,
-            "signature": record.signature,
-        }
-        for record in records
-    ]
+    return [RecordReducedResponse(id=record.id, name=record.title, signature=record.signature) for record in records]
 
 
-@router.get("/{record_id}")
+@router.get("/{record_id}", response_model=RecordResponse)
 async def get_record(
     record_id: str,
     db: Session = Depends(get_db),
@@ -229,23 +245,7 @@ async def get_record(
             detail="Record not found"
         )
 
-    return {
-        "id": str(record.id),
-        "title": record.title,
-        "description": record.description,
-        "signature": record.signature,
-        "comment": record.comment,
-        "restriction_id": str(record.restriction_id),
-        "restriction": record.restriction.name if record.restriction else None,
-        "workstatus_id": str(record.workstatus_id),
-        "workstatus": record.workstatus.status if record.workstatus else None,
-        "keywords_names": ", ".join(sorted([kw.name for kw in record.keywords_names])) if record.keywords_names else "",
-        "keywords_locations": ", ".join(sorted([kw.name for kw in record.keywords_locations])) if record.keywords_locations else "",
-        "created_on": record.created_on.isoformat() if record.created_on else None,
-        "created_by": str(record.created_by) if record.created_by else None,
-        "last_modified_on": record.last_modified_on.isoformat() if record.last_modified_on else None,
-        "last_modified_by": str(record.last_modified_by) if record.last_modified_by else None,
-    }
+    return RecordResponse.model_validate(record, from_attributes=True)
 
 
 @router.get("/{record_id}/download-combined-pdf")
@@ -356,9 +356,9 @@ async def download_combined_pdf(
         )
 
 
-@router.post("")
+@router.post("", response_model=RecordResponse, status_code=status.HTTP_201_CREATED)
 async def create_record(
-    data: dict,
+    data: RecordCreateRequest,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
@@ -375,8 +375,8 @@ async def create_record(
     """
     ensure_record_write_permission(current_user)
 
-    restriction_id = parse_uuid_value(data.get("restriction_id"), "restriction_id")
-    workstatus_id = parse_uuid_value(data.get("workstatus_id"), "workstatus_id")
+    restriction_id = data.restriction_id
+    workstatus_id = data.workstatus_id
 
     # Validate that restriction exists
     restriction = db.query(Restriction).filter(Restriction.id == restriction_id).first()
@@ -396,12 +396,31 @@ async def create_record(
 
     try:
         record = Record(
-            title=data.get("title"),
-            description=data.get("description"),
-            signature=data.get("signature"),
-            comment=data.get("comment"),
+            title=data.title,
+            description=data.description,
+            signature=data.signature,
+            signature2=data.signature2,
+            subtitle=data.subtitle,
+            comment=data.comment,
+            year=data.year,
+            isbn=data.isbn,
+            number_pages=data.number_pages,
+            edition=data.edition,
+            reihe=data.reihe,
+            volume=data.volume,
+            jahrgang=data.jahrgang,
+            enter_information=data.enter_information,
+            indecies=data.indecies,
+            enter_date=parse_optional_date(data.enter_date, "enter_date"),
+            sort_out_date=parse_optional_date(data.sort_out_date, "sort_out_date"),
+            bibl_nr=data.bibl_nr,
             restriction_id=restriction_id,
             workstatus_id=workstatus_id,
+            record_condition_id=data.record_condition_id,
+            loantype_id=data.loantype_id,
+            lettering_id=data.lettering_id,
+            publicationtype_id=data.publicationtype_id,
+            publisher_id=data.publisher_id,
             created_by=current_user.id,
         )
 
@@ -409,30 +428,21 @@ async def create_record(
         db.flush()  # Flush to get the record ID
 
         # Process keywords_names
-        if data.get("keywords_names"):
-            keywords_names = process_keywords(db, data.get("keywords_names"), KeywordName)
+        if data.keywords_names:
+            keywords_names = process_keywords(db, data.keywords_names, KeywordName)
             record.keywords_names = keywords_names
 
         # Process keywords_locations
-        if data.get("keywords_locations"):
-            keywords_locations = process_keywords(db, data.get("keywords_locations"), KeywordLocation)
+        if data.keywords_locations:
+            keywords_locations = process_keywords(db, data.keywords_locations, KeywordLocation)
             record.keywords_locations = keywords_locations
 
         db.commit()
         db.refresh(record)
 
-        return {
-            "id": str(record.id),
-            "title": record.title,
-            "description": record.description,
-            "signature": record.signature,
-            "comment": record.comment,
-            "restriction_id": str(record.restriction_id),
-            "workstatus_id": str(record.workstatus_id),
-            "keywords_names": ", ".join([kw.name for kw in record.keywords_names]) if record.keywords_names else "",
-            "keywords_locations": ", ".join([kw.name for kw in record.keywords_locations]) if record.keywords_locations else "",
-            "message": "Record created successfully"
-        }
+        return RecordResponse.model_validate(record, from_attributes=True)
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -441,10 +451,10 @@ async def create_record(
         )
 
 
-@router.put("/{record_id}")
+@router.put("/{record_id}", response_model=RecordResponse)
 async def update_record(
     record_id: str,
-    data: dict,
+    data: RecordUpdateRequest,
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
@@ -460,6 +470,7 @@ async def update_record(
     
     """
     ensure_record_write_permission(current_user)
+    data_dict = data.model_dump(exclude_unset=True)
 
     parsed_record_id = parse_uuid_value(record_id, "record_id")
     record = db.query(Record).filter(Record.id == parsed_record_id).first()
@@ -471,11 +482,11 @@ async def update_record(
         )
 
     restriction_id = record.restriction_id
-    if "restriction_id" in data and data.get("restriction_id") is not None:
-        restriction_id = parse_uuid_value(data.get("restriction_id"), "restriction_id")
+    if "restriction_id" in data_dict and data_dict.get("restriction_id") is not None:
+        restriction_id = data_dict.get("restriction_id")
 
     # Validate restriction if changed
-    if "restriction_id" in data:
+    if "restriction_id" in data_dict:
         restriction = db.query(Restriction).filter(Restriction.id == restriction_id).first()
         if not restriction:
             raise HTTPException(
@@ -484,11 +495,11 @@ async def update_record(
             )
 
     workstatus_id = record.workstatus_id
-    if "workstatus_id" in data and data.get("workstatus_id") is not None:
-        workstatus_id = parse_uuid_value(data.get("workstatus_id"), "workstatus_id")
+    if "workstatus_id" in data_dict and data_dict.get("workstatus_id") is not None:
+        workstatus_id = data_dict.get("workstatus_id")
 
     # Validate workstatus if changed
-    if "workstatus_id" in data:
+    if "workstatus_id" in data_dict:
         workstatus = db.query(WorkStatus).filter(WorkStatus.id == workstatus_id).first()
         if not workstatus:
             raise HTTPException(
@@ -498,39 +509,40 @@ async def update_record(
 
     try:
         # Update basic fields
-        record.title = data.get("title", record.title)
-        record.description = data.get("description", record.description)
-        record.signature = data.get("signature", record.signature)
-        record.comment = data.get("comment", record.comment)
+        for field in (
+            "title", "description", "signature", "signature2", "subtitle", "comment",
+            "year", "isbn", "number_pages", "edition", "reihe", "volume", "jahrgang",
+            "enter_information", "indecies", "bibl_nr", "record_condition_id", "loantype_id",
+            "lettering_id", "publicationtype_id", "publisher_id",
+        ):
+            if field in data_dict:
+                setattr(record, field, data_dict[field])
+
+        if "enter_date" in data_dict:
+            record.enter_date = parse_optional_date(data_dict.get("enter_date"), "enter_date")
+        if "sort_out_date" in data_dict:
+            record.sort_out_date = parse_optional_date(data_dict.get("sort_out_date"), "sort_out_date")
+
         record.restriction_id = restriction_id
         record.workstatus_id = workstatus_id
         record.last_modified_by = current_user.id
 
         # Update keywords_names
-        if "keywords_names" in data:
-            keywords_names = process_keywords(db, data.get("keywords_names"), KeywordName)
+        if "keywords_names" in data_dict:
+            keywords_names = process_keywords(db, data_dict.get("keywords_names"), KeywordName)
             record.keywords_names = keywords_names
 
         # Update keywords_locations
-        if "keywords_locations" in data:
-            keywords_locations = process_keywords(db, data.get("keywords_locations"), KeywordLocation)
+        if "keywords_locations" in data_dict:
+            keywords_locations = process_keywords(db, data_dict.get("keywords_locations"), KeywordLocation)
             record.keywords_locations = keywords_locations
 
         db.commit()
         db.refresh(record)
 
-        return {
-            "id": str(record.id),
-            "title": record.title,
-            "description": record.description,
-            "signature": record.signature,
-            "comment": record.comment,
-            "restriction_id": str(record.restriction_id),
-            "workstatus_id": str(record.workstatus_id),
-            "keywords_names": ", ".join([kw.name for kw in record.keywords_names]) if record.keywords_names else "",
-            "keywords_locations": ", ".join([kw.name for kw in record.keywords_locations]) if record.keywords_locations else "",
-            "message": "Record updated successfully"
-        }
+        return RecordResponse.model_validate(record, from_attributes=True)
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(

@@ -5,7 +5,7 @@ Pydantic schemas for request/response validation
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID
 
 
@@ -385,6 +385,366 @@ class PageListDetailResponse(PageListResponse):
 
 
 # ========================
+# Record Metadata Schemas (Lookup Tables)
+# ========================
+
+class LoanTypeResponse(BaseModel):
+    """Loan type response schema"""
+
+    id: UUID
+    loan: str
+    subtype: Optional[str] = None
+    comment: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LoanTypeCreate(BaseModel):
+    """Create loan type request"""
+
+    loan: str = Field(..., min_length=1, max_length=255)
+    subtype: Optional[str] = Field(None, max_length=255)
+    comment: Optional[str] = Field(None)
+
+
+class LanguageResponse(BaseModel):
+    """Language response schema"""
+
+    id: UUID
+    language: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LanguageCreate(BaseModel):
+    """Create language request"""
+
+    language: str = Field(..., min_length=1, max_length=255)
+
+
+class AuthorTypeResponse(BaseModel):
+    """Author type response schema"""
+
+    id: UUID
+    authortype: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuthorTypeCreate(BaseModel):
+    """Create author type request"""
+
+    authortype: str = Field(..., min_length=1, max_length=255)
+
+
+class AuthorResponse(BaseModel):
+    """Author response schema"""
+
+    id: UUID
+    first_name: Optional[str] = None
+    last_name: str
+    title: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuthorCreate(BaseModel):
+    """Create author request"""
+
+    first_name: Optional[str] = Field(None, max_length=255)
+    last_name: str = Field(..., min_length=1, max_length=255)
+    title: Optional[str] = Field(None, max_length=100)
+
+
+class AuthorUpdate(BaseModel):
+    """Update author request"""
+
+    first_name: Optional[str] = Field(None, max_length=255)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    title: Optional[str] = Field(None, max_length=100)
+
+
+class PublisherResponse(BaseModel):
+    """Publisher response schema"""
+
+    id: UUID
+    companyname: str
+    town: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PublisherCreate(BaseModel):
+    """Create publisher request"""
+
+    companyname: str = Field(..., min_length=1, max_length=255)
+    town: Optional[str] = Field(None, max_length=255)
+
+
+class PublisherUpdate(BaseModel):
+    """Update publisher request"""
+
+    companyname: Optional[str] = Field(None, min_length=1, max_length=255)
+    town: Optional[str] = Field(None, max_length=255)
+
+
+class PublicationTypeResponse(BaseModel):
+    """Publication type response schema"""
+
+    id: UUID
+    publicationtype: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PublicationTypeCreate(BaseModel):
+    """Create publication type request"""
+
+    publicationtype: str = Field(..., min_length=1, max_length=255)
+
+
+class RecordConditionResponse(BaseModel):
+    """Record condition response schema"""
+
+    id: UUID
+    condition: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RecordConditionCreate(BaseModel):
+    """Create record condition request"""
+
+    condition: str = Field(..., min_length=1, max_length=255)
+
+
+class LetteringResponse(BaseModel):
+    """Lettering response schema"""
+
+    id: UUID
+    lettering: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LetteringCreate(BaseModel):
+    """Create lettering request"""
+
+    lettering: str = Field(..., min_length=1, max_length=255)
+
+
+class KeywordRecordResponse(BaseModel):
+    """Keyword record response schema (bibliographic keyword with phonetic codes)"""
+
+    id: UUID
+    name: str
+    c_search: Optional[str] = None  # Cologne Phonetic
+    dblmeta_1: Optional[str] = None  # Double Metaphone primary
+    dblmeta_2: Optional[str] = None  # Double Metaphone secondary
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class KeywordRecordCreate(BaseModel):
+    """Create keyword record request"""
+
+    name: str = Field(..., min_length=1, max_length=255)
+
+
+# ========================
+# Record Author (Junction) Schemas
+# ========================
+
+class RecordAuthorCreate(BaseModel):
+    """Create record author request"""
+
+    author_id: UUID = Field(..., description="ID of the author")
+    authortype_id: Optional[UUID] = Field(None, description="ID of the author type (role)")
+    order: Optional[int] = Field(default=0, description="Order of author in list")
+
+
+class RecordAuthorResponse(BaseModel):
+    """Record author response with nested author and authortype details"""
+
+    id: UUID
+    record_id: UUID
+    author_id: UUID
+    authortype_id: Optional[UUID] = None
+    order: Optional[int] = None
+    author: Optional[AuthorResponse] = None
+    authortype: Optional[AuthorTypeResponse] = None
+    created_on: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ========================
+# Record Schemas (Main Table)
+# ========================
+
+class RecordBase(BaseModel):
+    """Base record schema with core fields"""
+
+    title: str = Field(..., min_length=1, max_length=255, description="Record title (required)")
+    signature: Optional[str] = Field(None, max_length=255, description="Primary signature/call number")
+    signature2: Optional[str] = Field(None, max_length=255, description="Secondary signature")
+    subtitle: Optional[str] = Field(None, max_length=500, description="Record subtitle")
+    description: Optional[str] = Field(None, description="General description")
+    comment: Optional[str] = Field(None, description="Internal comment")
+
+
+class RecordBibliographicFields(BaseModel):
+    """Bibliographic fields for records"""
+
+    year: Optional[str] = Field(None, max_length=50, description="Publication year")
+    isbn: Optional[str] = Field(None, max_length=50, description="ISBN number")
+    number_pages: Optional[str] = Field(None, max_length=50, description="Number of pages")
+    edition: Optional[str] = Field(None, max_length=100, description="Edition information")
+    reihe: Optional[str] = Field(None, max_length=255, description="Series name (Reihe)")
+    volume: Optional[str] = Field(None, max_length=100, description="Volume number")
+    jahrgang: Optional[str] = Field(None, max_length=100, description="Year/issue number (Jahrgang)")
+    bibl_nr: Optional[str] = Field(None, max_length=100, description="Bibliography number")
+    enter_information: Optional[str] = Field(None, description="Information about entry/addition to collection")
+    indecies: Optional[str] = Field(None, description="Index information")
+    enter_date: Optional[date] = Field(None, description="Date when record was entered (YYYY-MM-DD)")
+    sort_out_date: Optional[date] = Field(None, description="Date when record was sorted out (YYYY-MM-DD)")
+
+
+class RecordMetadataReferences(BaseModel):
+    """Foreign key references for record metadata"""
+
+    restriction_id: UUID = Field(..., description="ID of the restriction level")
+    workstatus_id: UUID = Field(..., description="ID of the work status")
+    record_condition_id: Optional[UUID] = Field(None, description="ID of the record condition")
+    loantype_id: Optional[UUID] = Field(None, description="ID of the loan type")
+    lettering_id: Optional[UUID] = Field(None, description="ID of the lettering type")
+    publicationtype_id: Optional[UUID] = Field(None, description="ID of the publication type")
+    publisher_id: Optional[UUID] = Field(None, description="ID of the publisher")
+
+
+class RecordCreate(RecordBase, RecordBibliographicFields, RecordMetadataReferences):
+    """Create record request with all bibliographic fields"""
+
+    pass
+
+
+class RecordCreateRequest(RecordCreate):
+    """Create record request including legacy keyword text fields"""
+
+    keywords_names: Optional[str] = Field(None, description="Comma-separated name keywords")
+    keywords_locations: Optional[str] = Field(None, description="Comma-separated location keywords")
+
+
+class RecordUpdate(BaseModel):
+    """Update record request - all fields optional"""
+
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    signature: Optional[str] = Field(None, max_length=255)
+    signature2: Optional[str] = Field(None, max_length=255)
+    subtitle: Optional[str] = Field(None, max_length=500)
+    description: Optional[str] = None
+    comment: Optional[str] = None
+    year: Optional[str] = Field(None, max_length=50)
+    isbn: Optional[str] = Field(None, max_length=50)
+    number_pages: Optional[str] = Field(None, max_length=50)
+    edition: Optional[str] = Field(None, max_length=100)
+    reihe: Optional[str] = Field(None, max_length=255)
+    volume: Optional[str] = Field(None, max_length=100)
+    jahrgang: Optional[str] = Field(None, max_length=100)
+    bibl_nr: Optional[str] = Field(None, max_length=100)
+    enter_information: Optional[str] = None
+    indecies: Optional[str] = None
+    enter_date: Optional[date] = None
+    sort_out_date: Optional[date] = None
+    restriction_id: Optional[UUID] = None
+    workstatus_id: Optional[UUID] = None
+    record_condition_id: Optional[UUID] = None
+    loantype_id: Optional[UUID] = None
+    lettering_id: Optional[UUID] = None
+    publicationtype_id: Optional[UUID] = None
+    publisher_id: Optional[UUID] = None
+
+
+class RecordUpdateRequest(RecordUpdate):
+    """Update record request including legacy keyword text fields"""
+
+    keywords_names: Optional[str] = None
+    keywords_locations: Optional[str] = None
+
+
+class RecordResponse(RecordBase, RecordBibliographicFields):
+    """Record response schema with basic metadata"""
+
+    id: UUID
+    restriction_id: UUID
+    workstatus_id: UUID
+    record_condition_id: Optional[UUID] = None
+    loantype_id: Optional[UUID] = None
+    lettering_id: Optional[UUID] = None
+    publicationtype_id: Optional[UUID] = None
+    publisher_id: Optional[UUID] = None
+    active: bool
+    created_on: datetime
+    created_by: Optional[UUID] = None
+    last_modified_on: Optional[datetime] = None
+    last_modified_by: Optional[UUID] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RecordDetailResponse(RecordResponse):
+    """Detailed record response with all relationships"""
+
+    # Metadata objects (eager loaded)
+    record_condition: Optional[RecordConditionResponse] = None
+    loantype: Optional[LoanTypeResponse] = None
+    lettering: Optional[LetteringResponse] = None
+    publicationtype: Optional[PublicationTypeResponse] = None
+    publisher: Optional[PublisherResponse] = None
+
+    # Associations
+    keywords_records: List[KeywordRecordResponse] = []
+    languages: List[LanguageResponse] = []
+    record_authors: List[RecordAuthorResponse] = []
+
+
+class RecordListItemResponse(BaseModel):
+    """Record list item used in paginated list endpoint"""
+
+    id: UUID
+    title: str
+    description: Optional[str] = None
+    signature: Optional[str] = None
+    comment: Optional[str] = None
+    restriction_id: UUID
+    restriction: Optional[str] = None
+    workstatus_id: UUID
+    workstatus: Optional[str] = None
+    keywords_names: str = ""
+    keywords_locations: str = ""
+    created_on: Optional[datetime] = None
+    created_by: Optional[UUID] = None
+    page_count: int = 0
+
+
+class RecordListResponse(BaseModel):
+    """Paginated record list response"""
+
+    items: List[RecordListItemResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class RecordReducedResponse(BaseModel):
+    """Reduced record response used for selectors"""
+
+    id: UUID
+    name: str
+    signature: Optional[str] = None
+
+
+# ========================
 # Generic Schemas
 # ========================
 
@@ -443,6 +803,42 @@ __all__ = [
     "PageResponse",
     "PageListResponse",
     "PageListDetailResponse",
+    # Record Metadata Schemas
+    "LoanTypeResponse",
+    "LoanTypeCreate",
+    "LanguageResponse",
+    "LanguageCreate",
+    "AuthorTypeResponse",
+    "AuthorTypeCreate",
+    "AuthorResponse",
+    "AuthorCreate",
+    "AuthorUpdate",
+    "PublisherResponse",
+    "PublisherCreate",
+    "PublisherUpdate",
+    "PublicationTypeResponse",
+    "PublicationTypeCreate",
+    "RecordConditionResponse",
+    "RecordConditionCreate",
+    "LetteringResponse",
+    "LetteringCreate",
+    "KeywordRecordResponse",
+    "KeywordRecordCreate",
+    "RecordAuthorResponse",
+    "RecordAuthorCreate",
+    # Record Schemas
+    "RecordBase",
+    "RecordBibliographicFields",
+    "RecordMetadataReferences",
+    "RecordCreate",
+    "RecordCreateRequest",
+    "RecordUpdate",
+    "RecordUpdateRequest",
+    "RecordResponse",
+    "RecordDetailResponse",
+    "RecordListItemResponse",
+    "RecordListResponse",
+    "RecordReducedResponse",
     "PaginatedResponse",
     "ErrorResponse",
     "SuccessResponse",
