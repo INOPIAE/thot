@@ -23,6 +23,18 @@ from .page import Page
 from .restriction_detail import RestrictionDetail
 from .user_confirmation import UserConfirmation
 from .user_confirmations import UserConfirmations
+from .keyword_record import KeywordRecord
+from .records_keywords_record import RecordsKeywordsRecord
+from .loantype import LoanType
+from .language import Language
+from .records_language import RecordsLanguage
+from .author import Author
+from .authortype import AuthorType
+from .record_author import RecordAuthor
+from .publisher import Publisher
+from .publicationtype import PublicationType
+from .record_condition import RecordCondition
+from .lettering import Lettering
 
 __all__ = [
     "User",
@@ -46,4 +58,16 @@ __all__ = [
     "RestrictionDetail",
     "UserConfirmation",
     "UserConfirmations",
+    "KeywordRecord",
+    "RecordsKeywordsRecord",
+    "LoanType",
+    "Language",
+    "RecordsLanguage",
+    "Author",
+    "AuthorType",
+    "RecordAuthor",
+    "Publisher",
+    "PublicationType",
+    "RecordCondition",
+    "Lettering",
 ]
