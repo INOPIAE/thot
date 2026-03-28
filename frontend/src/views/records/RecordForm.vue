@@ -514,17 +514,71 @@
 
         <div class="form-group">
           <label for="publisher">{{ $t('records.publisher') }}</label>
-          <select
-            id="publisher"
-            v-model="form.publisher_id"
-            class="form-control"
-            :disabled="isReadOnlyMode"
-          >
-            <option value="">{{ $t('records.selectPublisher') }}</option>
-            <option v-for="item in publishers" :key="item.id" :value="String(item.id)">
-              {{ item.companyname }}{{ item.town ? ` (${item.town})` : '' }}
-            </option>
-          </select>
+          <div class="d-flex align-items-center" style="gap: 8px;">
+            <div id="publisher" class="form-control" aria-readonly="true">
+              {{ getPublisherDisplayName() || $t('records.selectPublisher') }}
+            </div>
+            <button
+              v-if="canEditRecord"
+              type="button"
+              class="btn btn-primary btn-sm"
+              @click="openPublisherDialog"
+            >
+              {{ $t('records.addPublisher') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showPublisherDialog" class="modal-overlay" @click.self="showPublisherDialog = false">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">{{ $t('records.addPublisher') }}</h5>
+              <button type="button" class="btn-close" @click="showPublisherDialog = false"></button>
+            </div>
+            <div class="modal-body">
+              <div class="form-section">
+                <h6 class="mb-3">{{ $t('records.selectPublisher') }}</h6>
+                <select v-model="selectedPublisherId" class="form-control mb-3">
+                  <option value="">{{ $t('records.selectPublisher') }}</option>
+                  <option v-for="item in publishers" :key="item.id" :value="String(item.id)">
+                    {{ item.companyname }}{{ item.town ? ` (${item.town})` : '' }}
+                  </option>
+                </select>
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  :disabled="!selectedPublisherId"
+                  @click="selectPublisher"
+                >
+                  {{ $t('records.useSelectedPublisher') }}
+                </button>
+              </div>
+
+              <hr>
+
+              <div class="form-section">
+                <h6 class="mb-3">{{ $t('records.createPublisher') }}</h6>
+                <div class="form-group">
+                  <label for="publisher_companyname">{{ $t('records.publisherName') }} <span class="required">*</span></label>
+                  <input id="publisher_companyname" v-model="newPublisher.companyname" type="text" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label for="publisher_town">{{ $t('records.publisherTown') }}</label>
+                  <input id="publisher_town" v-model="newPublisher.town" type="text" class="form-control">
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" @click="showPublisherDialog = false">
+                {{ $t('common.cancel') }}
+              </button>
+              <button type="button" class="btn btn-info" @click="createPublisher" :disabled="creatingPublisher">
+                {{ creatingPublisher ? $t('common.saving') : $t('records.createPublisher') }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -594,6 +648,7 @@ export default defineComponent({
       loading: false,
       submitting: false,
       creatingAuthor: false,
+      creatingPublisher: false,
       error: null,
       successMessage: null,
       showQrCode: false,
@@ -607,7 +662,13 @@ export default defineComponent({
         first_name: '',
         authortype_id: '',
       },
+      newPublisher: {
+        companyname: '',
+        town: '',
+      },
+      selectedPublisherId: '',
       showAuthorDialog: false,
+      showPublisherDialog: false,
     }
   },
   computed: {
@@ -874,6 +935,58 @@ export default defineComponent({
       }
       const authorType = this.authorTypes.find(item => item.id === row.authortype_id)
       return authorType?.authortype || ''
+    },
+
+    getPublisherDisplayName() {
+      const selected = this.publishers.find(item => String(item.id) === String(this.form.publisher_id || ''))
+      if (!selected) {
+        return ''
+      }
+      return `${selected.companyname}${selected.town ? ` (${selected.town})` : ''}`
+    },
+
+    openPublisherDialog() {
+      this.selectedPublisherId = this.form.publisher_id ? String(this.form.publisher_id) : ''
+      this.showPublisherDialog = true
+    },
+
+    selectPublisher() {
+      if (!this.selectedPublisherId) {
+        return
+      }
+      this.form.publisher_id = this.selectedPublisherId
+      this.showPublisherDialog = false
+    },
+
+    async createPublisher() {
+      const companyname = this.newPublisher.companyname?.trim()
+      if (!companyname) {
+        this.error = this.$t('records.publisherNameRequired')
+        return
+      }
+
+      this.creatingPublisher = true
+      this.error = null
+      try {
+        const created = await recordService.createPublisher({
+          companyname,
+          town: this.newPublisher.town?.trim() || null,
+        })
+        this.publishers.push(created)
+        this.publishers.sort((a, b) => a.companyname.localeCompare(b.companyname))
+        this.form.publisher_id = String(created.id)
+
+        this.newPublisher = {
+          companyname: '',
+          town: '',
+        }
+        this.selectedPublisherId = ''
+        this.showPublisherDialog = false
+      } catch (err) {
+        this.error = err.message || err.detail || this.$t('records.saveError')
+      } finally {
+        this.creatingPublisher = false
+      }
     },
 
     async createAuthor() {

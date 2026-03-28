@@ -190,6 +190,18 @@ export const recordService = {
   },
 
   /**
+   * Create a new publisher
+   */
+  async createPublisher(data) {
+    try {
+      const response = await api.post('/library-metadata/publishers', data)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
    * Get author types for record author assignments
    */
   async listAuthorTypes() {
