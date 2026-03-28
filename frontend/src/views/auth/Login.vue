@@ -145,7 +145,10 @@ export default defineComponent({
       )
 
       if (success) {
-        this.$router.push('/')
+        const redirectTarget = typeof this.$route.query.redirect === 'string'
+          ? this.$route.query.redirect
+          : '/'
+        this.$router.push(redirectTarget)
       } else {
         this.error = this.getLoginErrorMessage()
       }

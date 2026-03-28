@@ -104,6 +104,8 @@
           <tr>
             <th>{{ $t('records.columnTitle') }}</th>
             <th>{{ $t('records.signature') }}</th>
+            <th>{{ $t('records.authors') }}</th>
+            <th>{{ $t('records.publisher') }}</th>
             <th>{{ $t('records.keywordsNames') }}</th>
             <th>{{ $t('records.keywordsLocations') }}</th>
             <th>{{ $t('records.restriction') }}</th>
@@ -117,6 +119,8 @@
           <tr v-for="record in records" :key="record.id">
             <td>{{ record.title }}</td>
             <td>{{ record.signature || '-' }}</td>
+            <td class="authors-cell">{{ record.authors || '-' }}</td>
+            <td class="publisher-cell">{{ record.publisher || '-' }}</td>
             <td class="keywords-cell">
               <span v-if="record.keywords_names" class="keywords-tag">
                 {{ record.keywords_names }}
@@ -210,14 +214,14 @@ export default defineComponent({
       return Math.ceil(this.totalRecords / this.pageSize)
     },
     canCreateRecord() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_bibl')
     },
     canEditRecord() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_bibl')
     },
     canManagePages() {
       return this.authStore.hasRole('admin') || 
-             this.authStore.hasRole('user_record') || 
+             this.authStore.hasRole('user_bibl') || 
              this.authStore.hasRole('user_scan') || 
              this.authStore.hasRole('user_page')
     },
@@ -445,6 +449,16 @@ export default defineComponent({
 
 .keywords-cell {
   max-width: 200px;
+}
+
+.authors-cell {
+  max-width: 250px;
+  word-break: break-word;
+}
+
+.publisher-cell {
+  max-width: 180px;
+  word-break: break-word;
 }
 
 .keywords-tag {

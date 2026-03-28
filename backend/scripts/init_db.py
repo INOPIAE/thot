@@ -93,7 +93,7 @@ def seed_database():
                 "description": "User is allowed to change page entries"
             },
             {
-                "name": "user_record",
+                "name": "user_bibl",
                 "description": "User is allowed to create and edit records"
             }
         ]

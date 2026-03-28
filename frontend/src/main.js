@@ -7,6 +7,7 @@ import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import App from './App.vue'
 import router from './router'
+import { useAuthStore } from './stores/auth'
 import { useAppStore } from './stores/app'
 import { messages, datetimeFormats, numberFormats } from './locales/messages'
 import { initializeFavicons } from './utils/favicon'
@@ -31,11 +32,21 @@ app.use(pinia)
 app.use(router)
 app.use(i18n)
 
-// Initialize app configuration from backend
 const appStore = useAppStore()
-app.mount('#app')
+const authStore = useAuthStore()
 
-// Load config in background so UI is visible even if backend is unavailable.
-appStore.initializeConfig().catch((error) => {
-  console.error('Background config initialization failed:', error)
-})
+async function bootstrap() {
+  try {
+    await appStore.initializeConfig()
+  } catch (error) {
+    console.error('Config initialization failed:', error)
+  }
+
+  if (authStore.token) {
+    await authStore.fetchUser()
+  }
+
+  app.mount('#app')
+}
+
+bootstrap()

@@ -30,7 +30,7 @@
         <span class="nav-label">{{ t('nav.records') }}</span>
         <ul>
           <li><router-link to="/records" @click="closeMenu">{{ t('nav.recordList') }}</router-link></li>
-          <li v-if="authStore.hasRole('admin') || authStore.hasRole('user_record')">
+          <li v-if="authStore.hasRole('admin') || authStore.hasRole('user_bibl')">
             <router-link to="/records/new" @click="closeMenu">{{ t('nav.createRecord') }}</router-link>
           </li>
         </ul>
@@ -57,6 +57,9 @@
           </li>
           <li v-if="authStore.hasRole('admin')">
             <router-link to="/admin/roles" @click="closeMenu">{{ t('nav.roles') }}</router-link>
+          </li>
+          <li v-if="authStore.hasRole('admin')">
+            <router-link to="/admin/records-import" @click="closeMenu">{{ t('nav.recordImport') }}</router-link>
           </li>
           <li><router-link to="/admin/data-maintenance" @click="closeMenu">{{ t('nav.dataMaintenance') }}</router-link></li>
         </ul>

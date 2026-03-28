@@ -6,14 +6,16 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
+import uuid
 import pyotp
 import jwt
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from config import config
+from app.database import get_db
 
 security = HTTPBearer()
 
@@ -109,20 +111,19 @@ def validate_password_requirements(password: str) -> tuple[bool, str]:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
 ):
     """
     Get current user from JWT token
     FastAPI dependency for routes that require authentication
     """
     # Import here to avoid circular imports
-    from app.database import get_db
-    from app.services.user_service import UserService
-    
-    # Get database session
-    db_gen = get_db()
-    db = next(db_gen)
-    
+    from app.models.role import Role
+    from app.models.role_permission import RolePermission
+    from app.models.user import User
+    from app.models.user_role import UserRole
+
     token = credentials.credentials
     user_id = decode_access_token(token)
 
@@ -133,7 +134,26 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user = UserService.get_user_by_id(db, user_id)
+    try:
+        user_id = uuid.UUID(user_id)
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = (
+        db.query(User)
+        .options(
+            selectinload(User.user_roles)
+            .selectinload(UserRole.role)
+            .selectinload(Role.role_permissions)
+            .selectinload(RolePermission.permission),
+        )
+        .filter(User.id == user_id)
+        .first()
+    )
     
     if not user:
         raise HTTPException(

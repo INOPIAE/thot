@@ -19,7 +19,6 @@ export default defineComponent({
   },
   setup() {
     const appStore = useAppStore()
-    const authStore = useAuthStore()
 
     // Set initial language
     if (appStore.language) {
@@ -28,14 +27,7 @@ export default defineComponent({
 
     return {
       appStore,
-      authStore,
     }
-  },
-  async mounted() {
-    await this.appStore.initializeConfig()
-
-    // Load user data if token exists
-    await this.authStore.fetchUser()
   },
 })
 </script>

@@ -10,6 +10,38 @@ const DEFAULT_SESSION_TIMEOUT_MINUTES = 60
 const DEFAULT_TOKEN_REFRESH_INTERVAL_MINUTES = 55
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart']
 
+function normalizeUserPayload(user) {
+  if (!user || typeof user !== 'object') {
+    return user
+  }
+
+  const roles = Array.isArray(user.roles)
+    ? user.roles
+      .map((role) => {
+        if (typeof role === 'string') {
+          return role
+        }
+
+        if (role && typeof role === 'object' && typeof role.name === 'string') {
+          return role.name
+        }
+
+        return null
+      })
+      .filter(Boolean)
+    : []
+
+  const permissions = Array.isArray(user.permissions)
+    ? user.permissions.filter((permission) => typeof permission === 'string')
+    : []
+
+  return {
+    ...user,
+    roles,
+    permissions,
+  }
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -27,8 +59,12 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.token,
     currentUser: (state) => state.user,
-    hasRole: (state) => (role) => state.user?.roles.includes(role) ?? false,
-    hasPermission: (state) => (permission) => state.user?.permissions.includes(permission) ?? false,
+    hasRole: (state) => (role) => Array.isArray(state.user?.roles)
+      ? state.user.roles.includes(role)
+      : false,
+    hasPermission: (state) => (permission) => Array.isArray(state.user?.permissions)
+      ? state.user.permissions.includes(permission)
+      : false,
   },
 
   actions: {
@@ -44,7 +80,7 @@ export const useAuthStore = defineStore('auth', {
         })
 
         this.token = response.data.access_token
-        this.user = response.data.user
+        this.user = normalizeUserPayload(response.data.user)
         localStorage.setItem('access_token', this.token)
         localStorage.setItem('last_activity_at', String(Date.now()))
         api.defaults.headers.common['Authorization'] = `Bearer ${this.token}`
@@ -121,7 +157,7 @@ export const useAuthStore = defineStore('auth', {
 
       try {
         const response = await api.get('/users/profile')
-        this.user = response.data
+        this.user = normalizeUserPayload(response.data)
         this.applySessionConfig()
         this.startSessionManagement()
         return true

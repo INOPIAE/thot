@@ -91,6 +91,12 @@ const routes = [
     meta: { requiresAuth: true, requiresRole: ['admin', 'support'] },
   },
   {
+    path: '/admin/records-import',
+    name: 'RecordImport',
+    component: () => import('@/views/admin/RecordImport.vue'),
+    meta: { requiresAuth: true, requiresRole: ['admin'] },
+  },
+  {
     path: '/records',
     name: 'RecordList',
     component: () => import('@/views/records/RecordList.vue'),
@@ -100,7 +106,7 @@ const routes = [
     path: '/records/new',
     name: 'RecordCreate',
     component: () => import('@/views/records/RecordForm.vue'),
-    meta: { requiresAuth: true, requiresRole: ['admin', 'user_record'] },
+    meta: { requiresAuth: true, requiresRole: ['admin', 'user_bibl'] },
   },
   {
     path: '/records/:id',
