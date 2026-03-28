@@ -305,86 +305,116 @@
         <small class="form-text">{{ $t('records.keywordsHelp') }}</small>
       </div>
 
-      <div class="form-group">
-        <label>{{ $t('records.authors') }}</label>
-        <div v-if="record_authors.length === 0" class="form-text text-muted">
-          {{ $t('records.noAuthors') }}
+        <div class="form-group">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <label>{{ $t('records.authors') }}</label>
+            <button v-if="canEditRecord" type="button" class="btn btn-primary btn-sm" @click="showAuthorDialog = true">
+              + {{ $t('records.addAuthor') }}
+            </button>
+          </div>
+
+          <div v-if="record_authors.length === 0" class="form-text text-muted">
+            {{ $t('records.noAuthors') }}
+          </div>
+          <table v-else class="authors-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{{ $t('records.authorName') }}</th>
+                <th>{{ $t('records.authorType') }}</th>
+                <th v-if="canEditRecord" style="width: 150px;"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(ra, index) in record_authors" :key="ra.id || `${ra.author_id}-${index}`">
+                <td>{{ index + 1 }}</td>
+                <td>{{ getAuthorDisplayName(ra) }}</td>
+                <td>{{ getAuthorTypeDisplayName(ra) }}</td>
+                <td v-if="canEditRecord" class="authors-actions-cell">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    @click="moveAuthorUp(index)"
+                    :disabled="index === 0"
+                    :title="$t('common.moveUp')"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-secondary"
+                    @click="moveAuthorDown(index)"
+                    :disabled="index === record_authors.length - 1"
+                    :title="$t('common.moveDown')"
+                  >
+                    ↓
+                  </button>
+                  <button type="button" class="btn btn-sm btn-danger" @click="removeAuthorRow(index)">
+                    {{ $t('common.delete') }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <table v-else class="authors-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>{{ $t('records.authorName') }}</th>
-              <th>{{ $t('records.authorType') }}</th>
-              <th v-if="canEditRecord"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(ra, index) in record_authors" :key="ra.id || `${ra.author_id}-${index}`">
-              <td>{{ index + 1 }}</td>
-              <td>
-                <select
-                  v-if="canEditRecord"
-                  v-model="ra.author_id"
-                  class="form-control"
-                >
-                  <option value="">{{ $t('records.selectAuthor') }}</option>
-                  <option v-for="author in authors" :key="author.id" :value="String(author.id)">
-                    {{ formatAuthorLabel(author) }}
-                  </option>
-                </select>
-                <span v-else>{{ getAuthorDisplayName(ra) }}</span>
-              </td>
-              <td>
-                <select
-                  v-if="canEditRecord"
-                  v-model="ra.authortype_id"
-                  class="form-control"
-                >
-                  <option value="">{{ $t('records.selectAuthorType') }}</option>
-                  <option v-for="item in authorTypes" :key="item.id" :value="String(item.id)">
-                    {{ item.authortype }}
-                  </option>
-                </select>
-                <span v-else>{{ getAuthorTypeDisplayName(ra) }}</span>
-              </td>
-              <td v-if="canEditRecord" class="authors-actions-cell">
-                <button type="button" class="btn btn-danger btn-small" @click="removeAuthorRow(index)">
-                  {{ $t('common.delete') }}
+
+        <!-- Author Dialog -->
+        <div v-if="showAuthorDialog" class="modal-overlay" @click.self="showAuthorDialog = false">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">{{ $t('records.addAuthor') }}</h5>
+                <button type="button" class="btn-close" @click="showAuthorDialog = false"></button>
+              </div>
+              <div class="modal-body">
+                <div class="form-section">
+                  <h6 class="mb-3">{{ $t('records.selectAuthor') }}</h6>
+                  <select id="select-author" class="form-control mb-3" @change="addAuthorFromDropdown">
+                    <option value="">{{ $t('records.selectAuthor') }}</option>
+                    <option v-for="author in authors" :key="author.id" :value="String(author.id)">
+                      {{ formatAuthorLabel(author) }}
+                    </option>
+                  </select>
+                  <div class="form-group">
+                    <label for="select-authortype">{{ $t('records.authorType') }}</label>
+                    <select id="select-authortype" v-model="newAuthor.authortype_id" class="form-control">
+                      <option value="">{{ $t('records.selectAuthorType') }}</option>
+                      <option v-for="item in authorTypes" :key="item.id" :value="String(item.id)">
+                        {{ item.authortype }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <hr />
+
+                <div class="form-section">
+                  <h6 class="mb-3">{{ $t('records.createAuthor') }}</h6>
+                  <div class="form-group">
+                    <label for="author_title">{{ $t('records.authorTitle') }}</label>
+                    <input id="author_title" v-model="newAuthor.title" type="text" class="form-control" />
+                  </div>
+                  <div class="form-group">
+                    <label for="author_last_name">{{ $t('records.authorLastName') }} <span class="required">*</span></label>
+                    <input id="author_last_name" v-model="newAuthor.last_name" type="text" class="form-control" />
+                  </div>
+                  <div class="form-group">
+                    <label for="author_first_name">{{ $t('records.authorFirstName') }}</label>
+                    <input id="author_first_name" v-model="newAuthor.first_name" type="text" class="form-control" />
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @click="showAuthorDialog = false">
+                  {{ $t('common.cancel') }}
                 </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div v-if="canEditRecord" class="authors-actions">
-          <button type="button" class="btn btn-secondary" @click="addAuthorRow">
-            {{ $t('records.addAuthor') }}
-          </button>
-        </div>
-
-        <div v-if="canEditRecord" class="author-create-box">
-          <div class="author-create-title">{{ $t('records.createAuthor') }}</div>
-          <div class="form-row three-columns">
-            <div class="form-group">
-              <label for="author_title">{{ $t('records.authorTitle') }}</label>
-              <input id="author_title" v-model="newAuthor.title" type="text" class="form-control" />
-            </div>
-            <div class="form-group">
-              <label for="author_last_name">{{ $t('records.authorLastName') }} <span class="required">*</span></label>
-              <input id="author_last_name" v-model="newAuthor.last_name" type="text" class="form-control" />
-            </div>
-            <div class="form-group">
-              <label for="author_first_name">{{ $t('records.authorFirstName') }}</label>
-              <input id="author_first_name" v-model="newAuthor.first_name" type="text" class="form-control" />
+                <button type="button" class="btn btn-info" @click="createAuthor" :disabled="creatingAuthor">
+                  {{ creatingAuthor ? $t('common.saving') : $t('records.createAuthor') }}
+                </button>
+              </div>
             </div>
           </div>
-          <button type="button" class="btn btn-info" @click="createAuthor" :disabled="creatingAuthor">
-            {{ creatingAuthor ? $t('common.saving') : $t('records.createAuthor') }}
-          </button>
         </div>
-      </div>
-
       <div class="form-row">
         <div class="form-group">
           <label for="restriction">{{ $t('records.restriction') }} <span class="required">*</span></label>
@@ -575,7 +605,9 @@ export default defineComponent({
         title: '',
         last_name: '',
         first_name: '',
+        authortype_id: '',
       },
+      showAuthorDialog: false,
     }
   },
   computed: {
@@ -776,19 +808,48 @@ export default defineComponent({
       }
     },
 
-    addAuthorRow() {
+    moveAuthorUp(index) {
+      if (index > 0) {
+        const temp = this.record_authors[index]
+        this.record_authors[index] = this.record_authors[index - 1]
+        this.record_authors[index - 1] = temp
+        this.updateAuthorOrders()
+      }
+    },
+
+    moveAuthorDown(index) {
+      if (index < this.record_authors.length - 1) {
+        const temp = this.record_authors[index]
+        this.record_authors[index] = this.record_authors[index + 1]
+        this.record_authors[index + 1] = temp
+        this.updateAuthorOrders()
+      }
+    },
+
+    updateAuthorOrders() {
+      this.record_authors.forEach((row, idx) => {
+        row.order = idx + 1
+      })
+    },
+
+    addAuthorFromDropdown(event) {
+      const authorId = event.target.value
+      if (!authorId) return
+      const author = this.authors.find(a => a.id === authorId)
+      if (!author) return
       this.record_authors.push({
-        author_id: '',
-        authortype_id: '',
+        author_id: authorId,
+        author,
+        authortype_id: this.newAuthor.authortype_id || '',
         order: this.record_authors.length + 1,
       })
+      event.target.value = ''
+      this.newAuthor.authortype_id = ''
     },
 
     removeAuthorRow(index) {
       this.record_authors.splice(index, 1)
-      this.record_authors.forEach((row, idx) => {
-        row.order = idx + 1
-      })
+      this.updateAuthorOrders()
     },
 
     formatAuthorLabel(author) {
@@ -833,22 +894,20 @@ export default defineComponent({
         this.authors.push(created)
         this.authors.sort((a, b) => this.formatAuthorLabel(a).localeCompare(this.formatAuthorLabel(b)))
 
-        const firstEmpty = this.record_authors.find(row => !row.author_id)
-        if (firstEmpty) {
-          firstEmpty.author_id = created.id
-        } else {
           this.record_authors.push({
             author_id: created.id,
-            authortype_id: '',
+            author: created,
+            authortype_id: this.newAuthor.authortype_id || '',
             order: this.record_authors.length + 1,
           })
-        }
 
         this.newAuthor = {
           title: '',
           last_name: '',
           first_name: '',
-        }
+            authortype_id: '',
+          }
+          this.showAuthorDialog = false
       } catch (err) {
         this.error = err.message || err.detail || this.$t('records.saveError')
       } finally {
@@ -965,31 +1024,9 @@ export default defineComponent({
     background: #fafafa;
   }
 
-  .authors-actions {
-    margin-top: 10px;
-  }
-
   .authors-actions-cell {
     width: 1%;
     white-space: nowrap;
-  }
-
-  .author-create-box {
-    margin-top: 16px;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: #fafafa;
-  }
-
-  .author-create-title {
-    margin-bottom: 8px;
-    font-weight: 600;
-  }
-
-  .btn-small {
-    padding: 4px 8px;
-    font-size: 12px;
   }
   border: 1px solid #ddd;
   border-radius: 4px;
@@ -1074,5 +1111,110 @@ textarea.form-control {
   .record-form {
     padding: 20px;
   }
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-dialog {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  max-width: 500px;
+  width: 90%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #999;
+}
+
+.btn-close:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.form-section {
+  margin-bottom: 16px;
+}
+
+.form-section h6 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.d-flex {
+  display: flex;
+}
+
+.justify-content-between {
+  justify-content: space-between;
+}
+
+.align-items-center {
+  align-items: center;
+}
+
+.mb-3 {
+  margin-bottom: 12px;
 }
 </style>
