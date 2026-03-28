@@ -13,6 +13,7 @@ from app.models import (
     Language,
     LoanType,
     PublicationType,
+    Publisher,
     Record,
     RecordAuthor,
     Role,
@@ -361,3 +362,93 @@ def test_record_import_invalid_date_is_cleared_and_logged(client, db):
     record = db.query(Record).filter(Record.signature == "SIG-DATE-1").first()
     assert record is not None
     assert record.enter_date is None
+
+
+def test_record_import_stores_publisher_id(client, db):
+    """Importing a row with a Verlag value must set publisher_id on the record."""
+    _ensure_default_workstatus(db)
+    admin_user = _create_user_with_role(db, "import_admin_publisher", "admin")
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Import"
+    sheet.append(
+        [
+            "Titel",
+            "Signatur Neu",
+            "Signatur2",
+            "PublikNr",
+            "Publikation",
+            "Schlagwörter",
+            "Orte",
+            "Familiennamen",
+            "Entleihbar",
+            "Jahr",
+            "ISBN_ISS",
+            "Seitenzahl",
+            "Auflage",
+            "Reihe",
+            "Band",
+            "Jahrgang",
+            "Sprache",
+            "Autor",
+            "Eingabedat2",
+            "Verlag",
+            "Verlagsort",
+        ]
+    )
+    sheet.append(
+        [
+            "Testatlogie",
+            "SIG-PUB-1",
+            "",
+            "BIB-PUB-1",
+            "Book",
+            "",
+            "",
+            "",
+            "",
+            "2024",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Deutsch",
+            "Muster, Max",
+            "2024-01-01",
+            "Testverlag GmbH",
+            "Berlin",
+        ]
+    )
+    buffer = BytesIO()
+    workbook.save(buffer)
+    file_bytes = buffer.getvalue()
+
+    response = client.post(
+        "/api/v1/admin/records-import/xlsx",
+        headers=_auth_headers_for_user(admin_user),
+        files={
+            "file": (
+                "import.xlsx",
+                file_bytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["imported"] == 1, payload
+    assert payload["skipped"] == 0
+
+    publisher = db.query(Publisher).filter(Publisher.companyname == "Testverlag GmbH").first()
+    assert publisher is not None, "Publisher was not created"
+    assert publisher.town == "Berlin"
+
+    record = db.query(Record).filter(Record.signature == "SIG-PUB-1").first()
+    assert record is not None
+    assert record.publisher_id == publisher.id, (
+        f"Expected publisher_id={publisher.id} but got {record.publisher_id}"
+    )

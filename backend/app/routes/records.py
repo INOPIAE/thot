@@ -42,11 +42,11 @@ router = APIRouter(
 
 
 def ensure_record_write_permission(current_user):
-    """Only admin and user_record may create/update/delete records."""
-    if not (current_user.has_role("admin") or current_user.has_role("user_record")):
+    """Only admin and user_bibl may create/update/delete records."""
+    if not (current_user.has_role("admin") or current_user.has_role("user_bibl")):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Insufficient permissions. Only admin or user_record can modify records.",
+            detail="Insufficient permissions. Only admin or user_bibl can modify records.",
         )
 
 
@@ -437,12 +437,12 @@ async def create_record(
 ):
     """
     Create a new record
-    Only users with 'admin' or 'user_record' role can create records
+    Only users with 'admin' or 'user_bibl' role can create records
         # Check user permissions
-        if not (current_user.has_role("admin") or current_user.has_role("user_record")):
+        if not (current_user.has_role("admin") or current_user.has_role("user_bibl")):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions. Only admin or user_record can create records."
+                detail="Insufficient permissions. Only admin or user_bibl can create records."
             )
     
     """
@@ -536,12 +536,12 @@ async def update_record(
 ):
     """
     Update a record
-    Only users with 'admin' or 'user_record' role can update records
+    Only users with 'admin' or 'user_bibl' role can update records
         # Check user permissions
-        if not (current_user.has_role("admin") or current_user.has_role("user_record")):
+        if not (current_user.has_role("admin") or current_user.has_role("user_bibl")):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions. Only admin or user_record can update records."
+                detail="Insufficient permissions. Only admin or user_bibl can update records."
             )
     
     """

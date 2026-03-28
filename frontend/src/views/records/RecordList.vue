@@ -214,14 +214,14 @@ export default defineComponent({
       return Math.ceil(this.totalRecords / this.pageSize)
     },
     canCreateRecord() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_bibl')
     },
     canEditRecord() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_bibl')
     },
     canManagePages() {
       return this.authStore.hasRole('admin') || 
-             this.authStore.hasRole('user_record') || 
+             this.authStore.hasRole('user_bibl') || 
              this.authStore.hasRole('user_scan') || 
              this.authStore.hasRole('user_page')
     },

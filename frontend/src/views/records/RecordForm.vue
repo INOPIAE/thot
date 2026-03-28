@@ -643,6 +643,7 @@ export default defineComponent({
       letterings: [],
       publicationTypes: [],
       publishers: [],
+      currentPublisher: null,
       authorTypes: [],
       authors: [],
       loading: false,
@@ -679,16 +680,30 @@ export default defineComponent({
       return this.$route.params.id
     },
     canEditRecord() {
-      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_record')
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_bibl')
     },
     isReadOnlyMode() {
       return this.isEditMode && !this.canEditRecord
     },
   },
+  watch: {
+    async recordId(newValue, oldValue) {
+      if (newValue === oldValue) {
+        return
+      }
+
+      this.currentPublisher = null
+      this.record_authors = []
+
+      if (newValue) {
+        await this.loadRecord()
+      }
+    },
+  },
   async mounted() {
     await this.loadMetadata()
     if (this.isEditMode) {
-      this.loadRecord()
+      await this.loadRecord()
     }
   },
   methods: {
@@ -789,6 +804,14 @@ export default defineComponent({
           lettering_id: record.lettering_id || '',
           publicationtype_id: record.publicationtype_id || '',
           publisher_id: record.publisher_id || '',
+        }
+        this.currentPublisher = record.publisher || null
+        if (
+          this.currentPublisher?.id &&
+          !this.publishers.some(item => String(item.id) === String(this.currentPublisher.id))
+        ) {
+          this.publishers.push(this.currentPublisher)
+          this.publishers.sort((a, b) => a.companyname.localeCompare(b.companyname))
         }
         this.record_authors = (record.record_authors || []).map((ra, index) => ({
           id: ra.id,
@@ -939,10 +962,18 @@ export default defineComponent({
 
     getPublisherDisplayName() {
       const selected = this.publishers.find(item => String(item.id) === String(this.form.publisher_id || ''))
-      if (!selected) {
-        return ''
+      if (selected) {
+        return `${selected.companyname}${selected.town ? ` (${selected.town})` : ''}`
       }
-      return `${selected.companyname}${selected.town ? ` (${selected.town})` : ''}`
+      if (
+        this.currentPublisher &&
+        typeof this.currentPublisher === 'object' &&
+        this.currentPublisher.companyname &&
+        String(this.currentPublisher.id || '') === String(this.form.publisher_id || '')
+      ) {
+        return `${this.currentPublisher.companyname}${this.currentPublisher.town ? ` (${this.currentPublisher.town})` : ''}`
+      }
+      return ''
     },
 
     openPublisherDialog() {
@@ -955,6 +986,8 @@ export default defineComponent({
         return
       }
       this.form.publisher_id = this.selectedPublisherId
+      this.currentPublisher =
+        this.publishers.find(item => String(item.id) === String(this.selectedPublisherId)) || null
       this.showPublisherDialog = false
     },
 
@@ -975,6 +1008,7 @@ export default defineComponent({
         this.publishers.push(created)
         this.publishers.sort((a, b) => a.companyname.localeCompare(b.companyname))
         this.form.publisher_id = String(created.id)
+        this.currentPublisher = created
 
         this.newPublisher = {
           companyname: '',

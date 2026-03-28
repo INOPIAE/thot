@@ -106,7 +106,7 @@ const routes = [
     path: '/records/new',
     name: 'RecordCreate',
     component: () => import('@/views/records/RecordForm.vue'),
-    meta: { requiresAuth: true, requiresRole: ['admin', 'user_record'] },
+    meta: { requiresAuth: true, requiresRole: ['admin', 'user_bibl'] },
   },
   {
     path: '/records/:id',

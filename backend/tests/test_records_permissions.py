@@ -107,8 +107,8 @@ def test_regular_user_is_read_only_for_records(client, db):
     assert delete_response.status_code == 403
 
 
-def test_user_record_role_can_modify_records(client, db):
-    power_user = _create_user_with_role(db, "editor_user", "user_record")
+def test_user_bibl_role_can_modify_records(client, db):
+    power_user = _create_user_with_role(db, "editor_user", "user_bibl")
     base_record = _create_record_fixture(db, power_user.id)
     headers = _auth_headers_for_user(power_user)
 
@@ -139,7 +139,7 @@ def test_user_record_role_can_modify_records(client, db):
 
 
 def test_create_record_requires_typed_body_fields(client, db):
-    power_user = _create_user_with_role(db, "typed_create_user", "user_record")
+    power_user = _create_user_with_role(db, "typed_create_user", "user_bibl")
     headers = _auth_headers_for_user(power_user)
 
     response = client.post(
@@ -154,7 +154,7 @@ def test_create_record_requires_typed_body_fields(client, db):
 
 
 def test_create_record_rejects_invalid_date_format(client, db):
-    power_user = _create_user_with_role(db, "date_validation_user", "user_record")
+    power_user = _create_user_with_role(db, "date_validation_user", "user_bibl")
     base_record = _create_record_fixture(db, power_user.id)
     headers = _auth_headers_for_user(power_user)
 
@@ -173,7 +173,7 @@ def test_create_record_rejects_invalid_date_format(client, db):
 
 
 def test_create_and_update_record_return_typed_response_fields(client, db):
-    power_user = _create_user_with_role(db, "typed_response_user", "user_record")
+    power_user = _create_user_with_role(db, "typed_response_user", "user_bibl")
     base_record = _create_record_fixture(db, power_user.id)
     headers = _auth_headers_for_user(power_user)
 
