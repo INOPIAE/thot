@@ -385,6 +385,36 @@ async def confirm_otp_reset(
 # - PUT /{user_id}/deactivate - Deactivate user
 
 
+# --- DELETE ACCOUNT ENDPOINT (SELF) ---
+@router.delete("/delete-account", status_code=status.HTTP_200_OK)
+async def delete_own_account(
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Delete Account (set active=False)
+    ---
+    EN: Allows the user to delete their own account (sets active=False, soft delete).
+    DE: Ermöglicht dem Benutzer, seinen eigenen Account zu löschen (setzt active=False, Soft-Delete).
+    """
+    user = UserService.get_user_by_id(db, current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    if not user.active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account is already deleted/inactive"
+        )
+    user.active = False
+    user.last_modified_on = datetime.now(timezone.utc)
+    user.last_modified_by = user.id
+    db.commit()
+    return {"message": "Account deleted successfully (soft delete)", "detail": {"en": "Your account has been deleted (deactivated).", "de": "Ihr Account wurde gelöscht (deaktiviert)."}}
+
+
 @router.put("/{user_id}/password-reset")
 async def support_reset_user_password(
     user_id: str,

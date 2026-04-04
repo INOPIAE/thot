@@ -178,6 +178,7 @@
       <div class="profile-section otp-section">
         <h3>{{ profileData.otp_enabled ? $t('user.changeOtp') : $t('user.setupOtp') }}</h3>
 
+
         <p class="otp-status" :class="profileData.otp_enabled ? 'otp-status-enabled' : 'otp-status-disabled'">
           {{ profileData.otp_enabled ? $t('user.otpStatusEnabled') : $t('user.otpStatusDisabled') }}
         </p>
@@ -238,6 +239,14 @@
             </button>
           </div>
         </div>
+      </div>
+
+      <div class="profile-section delete-section">
+        <h3>{{ $t('user.deleteAccount') }}</h3>
+        <p>{{ $t('user.deleteAccountDesc') }}</p>
+        <button @click="confirmDeleteAccount" class="btn-danger">
+          {{ $t('user.deleteAccountBtn') }}
+        </button>
       </div>
     </div>
   </div>
@@ -317,6 +326,24 @@ export default defineComponent({
     },
   },
   methods: {
+        async confirmDeleteAccount() {
+          if (!confirm(this.$t('user.deleteAccountConfirm'))) return
+          this.clearMessages()
+          this.isLoading = true
+          try {
+            const result = await userApi.deleteAccount()
+            this.successMessage = result.detail?.[this.profileData.current_language] || result.message || this.$t('user.accountDeleted')
+            // Optionally log out user after deletion
+            setTimeout(() => {
+              this.authStore.logout()
+              this.$router.push('/auth/login')
+            }, 2000)
+          } catch (error) {
+            this.errorMessage = error.detail || error.message || this.$t('messages.serverError')
+          } finally {
+            this.isLoading = false
+          }
+        },
     async loadProfile() {
       try {
         this.isLoading = true

@@ -5,6 +5,17 @@
 import api from './api'
 
 export const userService = {
+    /**
+     * Delete own account (soft delete)
+     */
+    async deleteAccount() {
+      try {
+        const response = await api.delete('/users/delete-account')
+        return response.data
+      } catch (error) {
+        throw error.response?.data || error
+      }
+    },
   /**
    * Get current user profile
    */

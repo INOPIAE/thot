@@ -206,6 +206,11 @@ export const messages = {
       otpResetSuccess: 'Two-factor authentication updated successfully',
       otpResetCancel: 'Cancel temporary setup',
       otpResetExpires: 'Temporary setup expires in {hours} hour(s).',
+      deleteAccount: 'Delete Account',
+      deleteAccountDesc: 'You can delete your account here',
+      deleteAccountBtn: 'Delete Account',
+      deleteAccountConfirm: 'Are you sure you want to delete your account? This action cannot be undone.',
+      accountDeleted: 'Your account has been deleted.',
     },
 
     // Admin/Support
@@ -753,6 +758,11 @@ export const messages = {
       otpResetSuccess: 'Zwei-Faktor-Authentifizierung erfolgreich aktualisiert',
       otpResetCancel: 'Temporäre Einrichtung verwerfen',
       otpResetExpires: 'Die temporäre Einrichtung läuft in {hours} Stunde(n) ab.',
+      deleteAccount: 'Account löschen',
+      deleteAccountDesc: 'Hier können Sie Ihren Account löschen.',
+      deleteAccountBtn: 'Account löschen',
+      deleteAccountConfirm: 'Sind Sie sicher, dass Sie Ihren Account löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.',
+      accountDeleted: 'Ihr Account wurde gelöscht.',
     },
 
     // Admin/Support

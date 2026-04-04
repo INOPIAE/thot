@@ -39,6 +39,29 @@ def _auth_headers_for_user(user: User) -> dict:
     }
 
 
+def test_user_can_delete_own_account(client, db):
+    """
+    EN: User can delete (deactivate) their own account (soft delete)
+    DE: Benutzer kann seinen eigenen Account löschen (deaktivieren, Soft-Delete)
+    """
+    user = _create_user_with_role(db, "deleteuser", "deleteuser@example.com", "user")
+    headers = _auth_headers_for_user(user)
+
+    # Delete own account
+    response = client.delete("/api/v1/users/delete-account", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["message"].startswith("Account deleted")
+    # Check user is inactive in DB
+    db.refresh(user)
+    assert user.active is False
+
+    # Try deleting again (should fail)
+    response2 = client.delete("/api/v1/users/delete-account", headers=headers)
+    assert response2.status_code == 400
+    assert "already deleted" in response2.json()["detail"]
+
+
 def test_user_cannot_change_own_corporate_number_via_profile(client, db):
     """Regular profile updates must not allow changing corporate_number."""
     user = _create_user_with_role(
