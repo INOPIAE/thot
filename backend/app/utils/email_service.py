@@ -18,6 +18,7 @@ class EmailService:
     def send_email_reset_confirmation(self, to_email: str, token: str, username: str, language: str = "en") -> bool:
         """Send confirmation email for email change (multilingual)"""
         confirm_link = f"{config.FRONTEND_URL}/auth/email-reset/confirm/{token}"
+        hours = getattr(config, "SUPPORT_EMAIL_CHANGE_TOKEN_EXPIRE_HOURS", 24)
         content = {
             "en": {
                 "subject": "Confirm Your New Email Address",
@@ -25,7 +26,7 @@ class EmailService:
                 "greeting": f"Hi {username},",
                 "message": "A request was made to change your email address. Click the link below to confirm:",
                 "button": "Confirm Email Change",
-                "expiry": "This link will expire in 1 hour.",
+                "expiry": f"This link will expire in {hours} hour{'s' if hours != 1 else ''}.",
                 "ignore": "If you did not request this change, please ignore this email.",
             },
             "de": {
@@ -34,7 +35,7 @@ class EmailService:
                 "greeting": f"Hallo {username},",
                 "message": "Es wurde eine Änderung Ihrer E-Mail-Adresse angefordert. Klicken Sie auf den folgenden Link, um zu bestätigen:",
                 "button": "E-Mail-Änderung bestätigen",
-                "expiry": "Dieser Link ist 1 Stunde gültig.",
+                "expiry": f"Dieser Link ist {hours} Stunde{'n' if hours != 1 else ''} gültig.",
                 "ignore": "Wenn Sie diese Änderung nicht angefordert haben, ignorieren Sie bitte diese E-Mail.",
             },
         }

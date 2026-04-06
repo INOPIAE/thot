@@ -5,29 +5,6 @@ from uuid import uuid4
 from datetime import datetime, timezone
 from app.routes import users
 
-@pytest.fixture
-def test_user(db):
-    db.query(User).filter_by(username="testuser").delete()
-    db.commit()
-    user = User(
-        id=uuid4(),
-        username="testuser",
-        email="old@example.com",
-        hashed_password="$2b$12$1234567890123456789012abcdefghijklmno12345678901234567890",
-        current_language="de",
-        active=True,
-        created_by=None,
-        created_on=datetime.now(timezone.utc),
-        last_modified_by=None,
-        last_modified_on=None,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    yield user
-    db.delete(user)
-    db.commit()
-
 
 def get_auth_header(user):
     return {"Authorization": f"Bearer testtoken-{user.id}"}

@@ -61,7 +61,8 @@ class Config:
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS = int(os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_HOURS", 24))
     USER_OTP_RESET_TOKEN_EXPIRE_HOURS = int(os.getenv("USER_OTP_RESET_TOKEN_EXPIRE_HOURS", 1))
     SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS = int(os.getenv("SUPPORT_OTP_RESET_TOKEN_EXPIRE_HOURS", 24))
-    EMAIL_CHANGE_TOKEN_EXPIRE_HOURS = 1
+    EMAIL_CHANGE_TOKEN_EXPIRE_HOURS = int(os.getenv("EMAIL_CHANGE_TOKEN_EXPIRE_HOURS", 1))
+    SUPPORT_EMAIL_CHANGE_TOKEN_EXPIRE_HOURS = int(os.getenv("SUPPORT_EMAIL_CHANGE_TOKEN_EXPIRE_HOURS", 24))
 
     # Login Security
     MAX_UNSUCCESSFUL_LOGINS = int(os.getenv("MAX_UNSUCCESSFUL_LOGINS", 5))
@@ -117,7 +118,7 @@ class Config:
     ALLOWED_FILE_EXTENSIONS = [".pdf"]
     WATERMARK_IMAGE_PATH = os.getenv("WATERMARK_IMAGE_PATH", "")
 
-    # QR Code logo (optional, embedded centred at 72×72 px)
+    # QR Code logo (optional, embedded centred at 72ï¿½72 px)
     QR_CODE_LOGO_PATH = os.getenv("QR_CODE_LOGO_PATH", "")
 
     # OCR pipeline configuration

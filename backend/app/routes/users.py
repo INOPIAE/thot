@@ -1,6 +1,4 @@
 
-
-
 from uuid import uuid4
 from datetime import timedelta
 from typing import List
@@ -31,14 +29,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.utils.email_service import email_service
 from config import config
 
-
-router = APIRouter(
-    prefix="/users",
-    tags=["users"],
-)
-
-
-
 security = HTTPBearer()
 
 async def get_current_user(db: Session = Depends(get_db), credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -47,21 +37,71 @@ async def get_current_user(db: Session = Depends(get_db), credentials: HTTPAutho
     """
     token = credentials.credentials
     user_id = decode_access_token(token)
-
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
-
     user = UserService.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"
         )
-
     return user
+
+router = APIRouter(
+    prefix="/users",
+    tags=["users"],
+)
+
+# --- E-Mail-Änderung durch Support/Admin: Request ---
+from uuid import UUID
+
+@router.post("/email-change/request/support", response_model=UserEmailResetResponse)
+async def request_email_change_support(
+    user_id: UUID,
+    request: UserEmailResetRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Support/Admin: Request email change for another user (24h valid, time from config)
+    """
+    # Rollenprüfung
+    if not (current_user.has_role("support") or current_user.has_role("admin")):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    db.query(UserEmailReset).filter(UserEmailReset.user_id == user.id).delete()
+    token = str(uuid4())
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=getattr(config, "SUPPORT_EMAIL_CHANGE_TOKEN_EXPIRE_HOURS", 24))
+    email_reset = UserEmailReset(
+        id=uuid4(),
+        user_id=user.id,
+        email=request.email,
+        token=token,
+        expires_at=expires_at,
+    )
+    db.add(email_reset)
+    db.commit()
+    db.refresh(email_reset)
+    language = getattr(user, "current_language", "en")
+    if background_tasks:
+        background_tasks.add_task(email_service.send_email_reset_confirmation, request.email, token, user.username, language)
+    else:
+        email_service.send_email_reset_confirmation(request.email, token, user.username, language)
+    return UserEmailResetResponse(
+        id=email_reset.id,
+        user_id=email_reset.user_id,
+        email=email_reset.email,
+        expires_at=email_reset.expires_at,
+    )
+
+
+
 
 
 # --- E-Mail-Änderung: Request ---
@@ -136,29 +176,6 @@ async def confirm_email_change(
     )
 
 
-security = HTTPBearer()
-
-async def get_current_user(db: Session = Depends(get_db), credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Get current user from JWT token
-    """
-    token = credentials.credentials
-    user_id = decode_access_token(token)
-
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
-        )
-
-    user = UserService.get_user_by_id(db, user_id)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-
-    return user
 
 
 @router.get("/profile", response_model=UserDetailResponse)
