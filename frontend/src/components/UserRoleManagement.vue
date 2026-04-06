@@ -138,8 +138,9 @@ export default defineComponent({
       return new Set(this.userRoles.map(r => r.role_id))
     },
     availableRoles() {
+      // Only exclude roles that are currently active for the user
       return this.allRoles.filter(role => {
-        return role.active && !this.everAssignedRoleIds.has(role.id)
+        return role.active && !this.activeRoleIds.has(role.id)
       })
     },
   },
