@@ -80,6 +80,32 @@
       </div>
 
       <div class="profile-section password-section">
+              <!-- Email Change Section -->
+              <div class="profile-section email-change-section">
+                <h3>{{ $t('emailChange.title') }}</h3>
+                <div class="form-group">
+                  <label for="newEmail">{{ $t('emailChange.newEmail') }}</label>
+                  <input
+                    id="newEmail"
+                    v-model="emailChangeForm.newEmail"
+                    type="email"
+                    :placeholder="$t('emailChange.newEmail')"
+                    @focus="clearMessages"
+                  />
+                </div>
+                <button
+                  @click="requestEmailChange"
+                  :disabled="isLoading || !emailChangeForm.newEmail"
+                  class="btn-primary"
+                >
+                  {{ isLoading ? $t('common.loading') : $t('emailChange.requestButton') }}
+                </button>
+                <p class="info-text">{{ $t('emailChange.info') }}</p>
+
+                <div v-if="emailChangeRequested" class="email-change-confirm">
+                  <p>{{ $t('emailChange.checkInboxInfo') }}</p>
+                </div>
+              </div>
         <h3>{{ $t('user.changePassword') }}</h3>
 
         <div class="form-group">
@@ -302,6 +328,12 @@ export default defineComponent({
       showCurrentPassword: false,
       showNewPassword: false,
       showConfirmPassword: false,
+      // Email change state
+      emailChangeForm: {
+        newEmail: '',
+        token: '',
+      },
+      emailChangeRequested: false,
     }
   },
   computed: {
@@ -326,6 +358,34 @@ export default defineComponent({
     },
   },
   methods: {
+    async requestEmailChange() {
+      this.clearMessages()
+      this.isLoading = true
+      try {
+        await userApi.changeEmail(this.emailChangeForm.newEmail)
+        this.successMessage = this.$t('emailChange.successRequest')
+        this.emailChangeRequested = true
+      } catch (error) {
+        this.errorMessage = error.detail || error.message || this.$t('emailChange.error')
+      } finally {
+        this.isLoading = false
+      }
+    },
+    async confirmEmailChange() {
+      this.clearMessages()
+      this.isLoading = true
+      try {
+        await userApi.confirmEmailChange(this.emailChangeForm.token)
+        this.successMessage = this.$t('emailChange.successConfirm')
+        this.emailChangeRequested = false
+        this.emailChangeForm = { newEmail: '', token: '' }
+        await this.loadProfile()
+      } catch (error) {
+        this.errorMessage = error.detail || error.message || this.$t('emailChange.error')
+      } finally {
+        this.isLoading = false
+      }
+    },
         async confirmDeleteAccount() {
           if (!confirm(this.$t('user.deleteAccountConfirm'))) return
           this.clearMessages()

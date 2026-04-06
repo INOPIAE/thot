@@ -435,8 +435,5 @@ async def confirm_otp_reset_token(
 
 # TODO: Implement remaining endpoints:
 # - /logout - Logout user
-# - /refresh - Refresh access token
-# - /users/email-change - Change email
-# - /users/email-change/confirm/{token} - Confirm email change
 # - /users/otp/enable - Enable OTP
 # - /users/otp/disable - Disable OTP

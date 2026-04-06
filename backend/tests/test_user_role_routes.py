@@ -141,34 +141,6 @@ def test_cannot_reassign_removed_role(client, db):
     assert "previously removed" in reassign_response.json()["detail"].lower()
 
 
-def test_admin_can_assign_and_remove_roles(client, db):
-    """Admin users can assign and remove roles"""
-    admin_user = _create_user_with_role(db, "adminuser", "admin@example.com", "admin")
-    target_user = _create_user_with_role(db, "targetuser", "target@example.com", "user")
-    
-    support_role = db.query(Role).filter(Role.name == "support").first()
-    if not support_role:
-        support_role = Role(name="support", description="Support role")
-        db.add(support_role)
-        db.commit()
-        db.refresh(support_role)
-
-    # Assign support role
-    assign_response = client.post(
-        f"/api/v1/users/{target_user.id}/roles",
-        headers=_auth_headers_for_user(admin_user),
-        json={"role_id": str(support_role.id)},
-    )
-    assert assign_response.status_code == 201
-
-    # Remove support role
-    remove_response = client.delete(
-        f"/api/v1/users/{target_user.id}/roles/{support_role.id}",
-        headers=_auth_headers_for_user(admin_user),
-    )
-    assert remove_response.status_code == 200
-
-
 def test_regular_user_cannot_assign_roles(client, db):
     """Regular users cannot assign roles"""
     regular_user = _create_user_with_role(db, "regularuser", "regular@example.com", "user")
@@ -189,3 +161,43 @@ def test_regular_user_cannot_assign_roles(client, db):
 
     assert response.status_code == 403
     assert "Insufficient permissions" in response.json()["detail"]
+
+def test_assign_support_role_requires_otp(client, db):
+    """Assigning support/admin role to user without OTP enabled returns 400"""
+    admin_user = _create_user_with_role(db, "adminuser2", "admin2@example.com", "admin")
+    target_user = _create_user_with_role(db, "targetuser2", "target2@example.com", "user")
+    support_role = db.query(Role).filter(Role.name == "support").first()
+    if not support_role:
+        support_role = Role(name="support", description="Support role")
+        db.add(support_role)
+        db.commit()
+        db.refresh(support_role)
+
+    assign_response = client.post(
+        f"/api/v1/users/{target_user.id}/roles",
+        headers=_auth_headers_for_user(admin_user),
+        json={"role_id": str(support_role.id)},
+    )
+    assert assign_response.status_code == 400
+    assert "otp enabled" in assign_response.json()["detail"].lower()
+
+def test_assign_support_role_with_otp_success(client, db):
+    """Assigning support/admin role to user WITH OTP enabled returns 201"""
+    admin_user = _create_user_with_role(db, "adminuser3", "admin3@example.com", "admin")
+    target_user = _create_user_with_role(db, "targetuser3", "target3@example.com", "user")
+    # Enable OTP for target user
+    target_user.otp_enabled = True
+    db.commit()
+    support_role = db.query(Role).filter(Role.name == "support").first()
+    if not support_role:
+        support_role = Role(name="support", description="Support role")
+        db.add(support_role)
+        db.commit()
+        db.refresh(support_role)
+
+    assign_response = client.post(
+        f"/api/v1/users/{target_user.id}/roles",
+        headers=_auth_headers_for_user(admin_user),
+        json={"role_id": str(support_role.id)},
+    )
+    assert assign_response.status_code == 201

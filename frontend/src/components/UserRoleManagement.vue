@@ -138,8 +138,9 @@ export default defineComponent({
       return new Set(this.userRoles.map(r => r.role_id))
     },
     availableRoles() {
+      // Only exclude roles that are currently active for the user
       return this.allRoles.filter(role => {
-        return role.active && !this.everAssignedRoleIds.has(role.id)
+        return role.active && !this.activeRoleIds.has(role.id)
       })
     },
   },
@@ -171,6 +172,7 @@ export default defineComponent({
       }
     },
 
+
     async assignRole() {
       if (!this.selectedRoleId) return
 
@@ -181,7 +183,18 @@ export default defineComponent({
       try {
         const selectedRole = this.availableRoles.find(r => r.id === this.selectedRoleId)
         const roleName = selectedRole?.name || ''
-        
+
+        // OTP enforcement for support/admin
+        if (selectedRole && ['support', 'admin'].includes(selectedRole.name.toLowerCase())) {
+          // Fetch user details to check OTP status
+          const user = await userService.getUserDetail(this.userId)
+          if (!user.otp_enabled) {
+            this.error = this.$t('admin.otpRequiredForRole', { role: roleName })
+            this.adding = false
+            return
+          }
+        }
+
         await userService.assignRoleToUser(this.userId, this.selectedRoleId)
         this.successMessage = this.$t('admin.roleAssignedSuccess', { roleName })
         this.selectedRoleId = ''

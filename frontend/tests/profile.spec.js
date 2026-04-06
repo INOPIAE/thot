@@ -64,7 +64,7 @@ const messages = {
       otpResetExpires: 'Temporary setup expires in {hours} hour(s).',
     },
     admin: {
-      approveCorporate: 'Approve Membership Number',
+      approveCorporate: 'Approved Membership Number',
     },
     messages: {
       loadingError: 'Error loading data',

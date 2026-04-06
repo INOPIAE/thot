@@ -15,6 +15,86 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
+    def send_email_reset_confirmation(self, to_email: str, token: str, username: str, language: str = "en") -> bool:
+        """Send confirmation email for email change (multilingual)"""
+        confirm_link = f"{config.FRONTEND_URL}/auth/email-reset/confirm/{token}"
+        hours = getattr(config, "SUPPORT_EMAIL_CHANGE_TOKEN_EXPIRE_HOURS", 24)
+        content = {
+            "en": {
+                "subject": "Confirm Your New Email Address",
+                "title": "Email Change Request",
+                "greeting": f"Hi {username},",
+                "message": "A request was made to change your email address. Click the link below to confirm:",
+                "button": "Confirm Email Change",
+                "expiry": f"This link will expire in {hours} hour{'s' if hours != 1 else ''}.",
+                "ignore": "If you did not request this change, please ignore this email.",
+            },
+            "de": {
+                "subject": "Bestätigen Sie Ihre neue E-Mail-Adresse",
+                "title": "Anfrage zur E-Mail-Änderung",
+                "greeting": f"Hallo {username},",
+                "message": "Es wurde eine Änderung Ihrer E-Mail-Adresse angefordert. Klicken Sie auf den folgenden Link, um zu bestätigen:",
+                "button": "E-Mail-Änderung bestätigen",
+                "expiry": f"Dieser Link ist {hours} Stunde{'n' if hours != 1 else ''} gültig.",
+                "ignore": "Wenn Sie diese Änderung nicht angefordert haben, ignorieren Sie bitte diese E-Mail.",
+            },
+        }
+        lang = content.get(language, content["en"])
+        subject = lang["subject"]
+        html_content = f"""
+        <html>
+            <body>
+                <h2>{lang["title"]}</h2>
+                <p>{lang["greeting"]}</p>
+                <p>{lang["message"]}</p>
+                <p>
+                    <a href=\"{confirm_link}\" style=\"background-color: #FF9800; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;\">
+                        {lang["button"]}
+                    </a>
+                </p>
+                <p>{lang["expiry"]}</p>
+                <p>{lang["ignore"]}</p>
+            </body>
+        </html>
+        """
+        plain_text = (
+            f"{lang['greeting']}\n\n"
+            f"{lang['message']}\n"
+            f"{confirm_link}\n\n"
+            f"{lang['expiry']}\n"
+            f"{lang['ignore']}"
+        )
+        return self.send_email(to_email, subject, html_content, plain_text)
+
+    def send_email_reset_info(self, to_email: str, username: str, language: str = "en") -> bool:
+        """Send info email to old address after email change (multilingual)"""
+        content = {
+            "en": {
+                "subject": "Your Email Address Was Changed",
+                "title": "Email Address Changed",
+                "greeting": f"Hi {username},",
+                "message": "Your email address was changed. If this was not you, please contact support immediately.",
+            },
+            "de": {
+                "subject": "Ihre E-Mail-Adresse wurde geändert",
+                "title": "E-Mail-Adresse geändert",
+                "greeting": f"Hallo {username},",
+                "message": "Ihre E-Mail-Adresse wurde geändert. Falls Sie dies nicht waren, kontaktieren Sie bitte umgehend den Support.",
+            },
+        }
+        lang = content.get(language, content["en"])
+        subject = lang["subject"]
+        html_content = f"""
+        <html>
+            <body>
+                <h2>{lang["title"]}</h2>
+                <p>{lang["greeting"]}</p>
+                <p>{lang["message"]}</p>
+            </body>
+        </html>
+        """
+        plain_text = f"{lang['greeting']}\n\n{lang['message']}"
+        return self.send_email(to_email, subject, html_content, plain_text)
     """Service for sending emails"""
 
     def __init__(self):

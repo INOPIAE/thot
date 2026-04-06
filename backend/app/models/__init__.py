@@ -3,6 +3,7 @@ Database models
 """
 
 from .user import User
+from .user_email_reset import UserEmailReset
 from .role import Role
 from .permission import Permission
 from .user_role import UserRole

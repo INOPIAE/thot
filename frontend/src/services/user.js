@@ -1,10 +1,22 @@
+import api from './api'
+
 /**
  * Service for User API calls
  */
-
-import api from './api'
-
 export const userService = {
+  /**
+   * Request email change for another user (admin/support)
+   */
+  async requestSupportEmailChange(userId, email) {
+    try {
+      const response = await api.post(`/users/email-change/request/support?user_id=${encodeURIComponent(userId)}`, {
+        email,
+      })
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
     /**
      * Delete own account (soft delete)
      */
@@ -59,10 +71,14 @@ export const userService = {
   /**
    * Change email
    */
+
+  /**
+   * Request email change (step 1)
+   */
   async changeEmail(newEmail) {
     try {
-      const response = await api.post('/users/email-change', {
-        new_email: newEmail,
+      const response = await api.post('/users/email-change/request', {
+        email: newEmail,
       })
       return response.data
     } catch (error) {
@@ -73,10 +89,14 @@ export const userService = {
   /**
    * Confirm email change
    */
-  async confirmEmailChange(verificationCode) {
+
+  /**
+   * Confirm email change (step 2)
+   */
+  async confirmEmailChange(token) {
     try {
-      const response = await api.post('/users/email-change/confirm/:token', {
-        verification_code: verificationCode,
+      const response = await api.post('/users/email-change/confirm', {
+        token,
       })
       return response.data
     } catch (error) {

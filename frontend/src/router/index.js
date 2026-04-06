@@ -1,11 +1,20 @@
 /**
  * Vue Router Configuration
  */
+/**
+ * Vue Router Configuration
+ */
 
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
+    {
+      path: '/auth/email-reset/confirm/:token',
+      name: 'EmailResetConfirm',
+      component: () => import('@/views/auth/EmailResetConfirm.vue'),
+      meta: { requiresAuth: false },
+    },
   {
     path: '/',
     name: 'Home',

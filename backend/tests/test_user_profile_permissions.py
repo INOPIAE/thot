@@ -45,7 +45,10 @@ def test_user_can_delete_own_account(client, db):
     DE: Benutzer kann seinen eigenen Account löschen (deaktivieren, Soft-Delete)
     """
     user = _create_user_with_role(db, "deleteuser", "deleteuser@example.com", "user")
+    db.refresh(user)
+    print(f"[DEBUG] user.id: {user.id} (type: {type(user.id)})")
     headers = _auth_headers_for_user(user)
+    print(f"[DEBUG] headers: {headers}")
 
     # Delete own account
     response = client.delete("/api/v1/users/delete-account", headers=headers)

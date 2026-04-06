@@ -23,7 +23,7 @@ class User(BaseModel):
     username = Column(String(255), unique=True, nullable=False, index=True)
     first_name = Column(String(255), nullable=True)
     last_name = Column(String(255), nullable=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     unsuccessful_logins = Column(Integer, default=0, nullable=False)
     timestamp_last_successful_login = Column(DateTime(timezone=True), nullable=True)
@@ -35,6 +35,7 @@ class User(BaseModel):
 
     # Relationships
     user_roles = relationship("UserRole", back_populates="user", cascade="all, delete-orphan")
+    email_resets = relationship("UserEmailReset", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, username={self.username}, email={self.email})>"

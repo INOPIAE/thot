@@ -25,37 +25,20 @@
       <div class="search-fields">
         <div class="form-group">
           <label for="search-username">{{ $t('admin.filterUsername') }}</label>
-          <input
-            id="search-username"
-            v-model="search.username"
-            type="text"
-            class="form-control"
-            :placeholder="$t('admin.usernamePlaceholder')"
-            @input="handleSearch"
-          />
+          <input id="search-username" v-model="search.username" type="text" class="form-control"
+            :placeholder="$t('admin.usernamePlaceholder')" @input="handleSearch" />
         </div>
 
         <div class="form-group">
           <label for="search-email">{{ $t('admin.filterEmail') }}</label>
-          <input
-            id="search-email"
-            v-model="search.email"
-            type="text"
-            class="form-control"
-            :placeholder="$t('admin.emailPlaceholder')"
-            @input="handleSearch"
-          />
+          <input id="search-email" v-model="search.email" type="text" class="form-control"
+            :placeholder="$t('admin.emailPlaceholder')" @input="handleSearch" />
         </div>
 
 
         <div class="form-group">
           <label for="page-size">{{ $t('common.itemsPerPage') }}</label>
-          <select
-            id="page-size"
-            v-model.number="pageSize"
-            class="form-control"
-            @change="handlePageSizeChange"
-          >
+          <select id="page-size" v-model.number="pageSize" class="form-control" @change="handlePageSizeChange">
             <option value="10">10</option>
             <option value="20">20</option>
             <option value="50">50</option>
@@ -65,12 +48,7 @@
         <!-- Only show to admin -->
         <div class="form-group" v-if="isAdmin">
           <label for="include-inactive">
-            <input
-              id="include-inactive"
-              type="checkbox"
-              v-model="search.includeInactive"
-              @change="handleSearch"
-            />
+            <input id="include-inactive" type="checkbox" v-model="search.includeInactive" @change="handleSearch" />
             {{ $t('admin.includeInactive') }}
           </label>
         </div>
@@ -122,22 +100,14 @@
             <td>{{ user.corporate_number || '-' }}</td>
             <td>
               <div class="checkbox-cell">
-                <input
-                  type="checkbox"
-                  :checked="user.corporate_approved"
-                  @change="handleCorporateApprovedChange(user.id, user.username, $event)"
-                  class="form-checkbox"
-                />
+                <input type="checkbox" :checked="user.corporate_approved"
+                  @change="handleCorporateApprovedChange(user.id, user.username, $event)" class="form-checkbox" />
               </div>
             </td>
             <td>
               <div class="checkbox-cell">
-                <input
-                  type="checkbox"
-                  :checked="user.active"
-                  @change="handleActiveChange(user.id, user.username, $event)"
-                  class="form-checkbox"
-                />
+                <input type="checkbox" :checked="user.active"
+                  @change="handleActiveChange(user.id, user.username, $event)" class="form-checkbox" />
               </div>
             </td>
             <td>
@@ -170,21 +140,13 @@
 
       <!-- Pagination -->
       <div v-if="totalPages > 1" class="pagination">
-        <button
-          :disabled="currentPage === 1"
-          class="btn btn-sm"
-          @click="previousPage"
-        >
+        <button :disabled="currentPage === 1" class="btn btn-sm" @click="previousPage">
           {{ $t('common.previous') }}
         </button>
         <span class="pagination-info">
           {{ $t('common.pagingInfo', { current: currentPage, total: totalPages }) }}
         </span>
-        <button
-          :disabled="currentPage === totalPages"
-          class="btn btn-sm"
-          @click="nextPage"
-        >
+        <button :disabled="currentPage === totalPages" class="btn btn-sm" @click="nextPage">
           {{ $t('common.next') }}
         </button>
       </div>
@@ -217,22 +179,33 @@
           </div>
           <div class="detail-field">
             <label>{{ $t('common.email') }}</label>
-            <div>{{ selectedUserDetails.email }}</div>
+            <div>
+              <span>{{ selectedUserDetails.email }}</span>
+              <div v-if="canManageRoles">
+                <input v-model="supportEmailChange.newEmail" type="email" :placeholder="$t('emailChange.newEmail')"
+                  class="form-control" style="margin-top: 0.5em;" />
+                <button class="btn btn-primary btn-sm"
+                  :disabled="!supportEmailChange.newEmail || supportEmailChange.loading"
+                  @click="requestSupportEmailChange" style="margin-left: 0.5em;">
+                  {{ supportEmailChange.loading ? $t('common.loading') : $t('emailChange.requestButton') }}
+                </button>
+                <div v-if="supportEmailChange.success" class="alert alert-success" style="margin-top:0.5em;">
+                  {{ $t('emailChange.successRequest') }}
+                </div>
+                <div v-if="supportEmailChange.error" class="alert alert-error" style="margin-top:0.5em;">
+                  {{ supportEmailChange.error }}
+                </div>
+              </div>
+            </div>
           </div>
+
           <div class="detail-field">
             <label>{{ $t('admin.corporateNumber') }}</label>
             <div class="corporate-number-editor">
-              <input
-                v-model="editableCorporateNumber"
-                type="text"
-                class="form-control"
-                :placeholder="$t('admin.corporateNumber')"
-              />
-              <button
-                class="btn btn-primary btn-sm"
-                :disabled="savingCorporateNumber || !hasCorporateNumberChanged"
-                @click="saveCorporateNumber"
-              >
+              <input v-model="editableCorporateNumber" type="text" class="form-control"
+                :placeholder="$t('admin.corporateNumber')" />
+              <button class="btn btn-primary btn-sm" :disabled="savingCorporateNumber || !hasCorporateNumberChanged"
+                @click="saveCorporateNumber">
                 {{ savingCorporateNumber ? $t('common.loading') : $t('common.save') }}
               </button>
             </div>
@@ -247,18 +220,16 @@
           </div>
           <div class="detail-field">
             <label>{{ $t('admin.otpStatus') }}</label>
-            <div>{{ selectedUserDetails.otp_enabled ? $t('user.otpStatusEnabled') : $t('user.otpStatusDisabled') }}</div>
+            <div>{{ selectedUserDetails.otp_enabled ? $t('user.otpStatusEnabled') : $t('user.otpStatusDisabled') }}
+            </div>
           </div>
           <div class="detail-field">
             <label>{{ $t('common.createdOn') }}</label>
             <div>{{ formatDate(selectedUserDetails.created_on) }}</div>
           </div>
 
-          <UserRoleManagement
-            :user-id="selectedUserDetails.id"
-            :can-manage-roles="canManageRoles"
-            @roles-updated="handleRolesUpdated"
-          />
+          <UserRoleManagement :user-id="selectedUserDetails.id" :can-manage-roles="canManageRoles"
+            @roles-updated="handleRolesUpdated" />
         </div>
       </div>
     </div>
@@ -276,15 +247,9 @@ export default defineComponent({
   components: {
     UserRoleManagement,
   },
-  setup() {
-    const authStore = useAuthStore()
-
-    return {
-      authStore,
-    }
-  },
   data() {
     return {
+      authStore: useAuthStore(),
       users: [],
       loading: false,
       error: null,
@@ -306,6 +271,12 @@ export default defineComponent({
       userRoles: {},
       editableCorporateNumber: '',
       savingCorporateNumber: false,
+      supportEmailChange: {
+        newEmail: '',
+        loading: false,
+        success: false,
+        error: '',
+      },
     }
   },
   computed: {
@@ -347,10 +318,10 @@ export default defineComponent({
 
         this.users = response.items || []
         this.totalUsers = response.total || 0
-        
+
         // Load roles for each user
         await this.loadUserRoles()
-        
+
         // Load statistics
         await this.loadStatistics()
       } catch (err) {
@@ -385,7 +356,7 @@ export default defineComponent({
             this.userRoles[user.id] = []
           }
         })
-        
+
         await Promise.all(rolePromises)
       } catch (err) {
         console.error('Error loading user roles:', err)
@@ -439,6 +410,8 @@ export default defineComponent({
         this.selectedUserDetails = await userService.getUserDetail(userId)
         this.editableCorporateNumber = this.selectedUserDetails.corporate_number || ''
         this.showDetailsModal = true
+        // Reset support email change state
+        this.supportEmailChange = { newEmail: '', loading: false, success: false, error: '' }
       } catch (err) {
         this.error = err.message || this.$t('admin.userLoadError')
       }
@@ -504,6 +477,7 @@ export default defineComponent({
       }
     },
 
+
     async startOtpReset(userId, username) {
       if (!confirm(this.$t('admin.confirmOtpReset', { username }))) {
         return
@@ -517,6 +491,27 @@ export default defineComponent({
         })
       } catch (err) {
         this.error = err.message || this.$t('admin.otpResetError')
+      }
+    },
+
+    async requestSupportEmailChange() {
+      if (!this.selectedUserDetails || !this.supportEmailChange.newEmail) {
+        return
+      }
+      this.supportEmailChange.loading = true
+      this.supportEmailChange.success = false
+      this.supportEmailChange.error = ''
+      try {
+        await userService.requestSupportEmailChange(
+          this.selectedUserDetails.id,
+          this.supportEmailChange.newEmail
+        )
+        this.supportEmailChange.success = true
+        this.supportEmailChange.newEmail = ''
+      } catch (err) {
+        this.supportEmailChange.error = err?.response?.data?.detail || err.message || this.$t('emailChange.errorRequest')
+      } finally {
+        this.supportEmailChange.loading = false
       }
     },
 
@@ -562,10 +557,10 @@ export default defineComponent({
         minute: '2-digit',
       })
     },
+
   },
 })
 </script>
-
 <style scoped>
 .users-container {
   padding: 2rem;
@@ -851,7 +846,7 @@ export default defineComponent({
     flex-direction: column;
   }
 
-  .actions-cell > * {
+  .actions-cell>* {
     width: 100%;
   }
 }

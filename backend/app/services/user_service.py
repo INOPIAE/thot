@@ -419,6 +419,13 @@ class UserService:
         
         if not role.active:
             return None, "Role is not active"
+
+        # OTP-Prüfung für support/admin (außer erster User)
+        if role.name in ("support", "admin"):
+            # Erster User: hat nur eine Zeile in users
+            user_count = db.query(User).count()
+            if user_count > 1 and not user.otp_enabled:
+                return None, "User must have OTP enabled to be assigned support/admin role"
         
         # Check if there's already an active assignment
         existing_active = db.query(UserRole).filter(

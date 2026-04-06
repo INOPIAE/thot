@@ -38,6 +38,14 @@ app = FastAPI(
     description="RESTful API for NLF Database Management",
     terms_of_service=config.API_TERMS_OF_SERVICE_URL,
     lifespan=lifespan,
+    openapi_tags=[
+        {"name": "authentication", "description": "Authentication and user management"},
+        {"name": "users", "description": "User management and profile"},
+        {"name": "roles", "description": "Role and permission management"},
+        {"name": "records", "description": "Record and object management"},
+        {"name": "pages", "description": "Page management and OCR processing"},
+        {"name": "admin-record-import", "description": "Admin-only record import routes"},
+    ]
 )
 
 # Add CORS middleware
