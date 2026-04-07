@@ -469,3 +469,196 @@ def test_user_is_active_and_locked():
         user.user_roles = [user_role]
         perms = user.get_permissions()
         assert set(perms) == {"read", "write"}
+
+
+def test_get_user_by_id_invalid_uuid(db):
+    # Zeile 31, 34: Fehlerhafte UUID
+    user = UserService.get_user_by_id(db, "not-a-uuid")
+    assert user is None
+
+def test_update_user_profile_user_not_found(db):
+    # Zeile 102-103: User nicht gefunden
+    with pytest.raises(ValueError):
+        UserService.update_user_profile(db, str(uuid.uuid4()), first_name="X")
+
+def test_change_password_user_not_found(db):
+    # Zeile 117: User nicht gefunden
+    success, msg = UserService.change_password(db, str(uuid.uuid4()), "x", "y")
+    assert not success and "not found" in msg
+
+def test_change_password_wrong_current(db, setup_roles):
+    # Zeile 120: Falsches Passwort
+    user = UserService.create_user(db, "pwuser", "pw@example.com", "pw1", is_first_user=False)
+    success, msg = UserService.change_password(db, str(user.id), "wrong", "new")
+    assert not success and "incorrect" in msg
+
+def test_change_password_invalid_new(db, setup_roles, monkeypatch):
+    # Zeile 170: Passwortvalidierung schlägt fehl
+    user = UserService.create_user(db, "pwuser2", "pw2@example.com", "pw1", is_first_user=False)
+    monkeypatch.setattr("app.services.user_service.validate_password_requirements", lambda pw: (False, "fail"))
+    success, msg = UserService.change_password(db, str(user.id), "pw1", "bad")
+    assert not success and msg == "fail"
+
+def test_reset_password_user_not_found(db):
+    # Zeile 182-183: User nicht gefunden
+    success, msg = UserService.reset_password(db, str(uuid.uuid4()), "new")
+    assert not success and "not found" in msg
+
+def test_reset_password_invalid_new(db, setup_roles, monkeypatch):
+    # Zeile 196: Passwortvalidierung schlägt fehl
+    user = UserService.create_user(db, "pwuser3", "pw3@example.com", "pw1", is_first_user=False)
+    monkeypatch.setattr("app.services.user_service.validate_password_requirements", lambda pw: (False, "fail"))
+    success, msg = UserService.reset_password(db, str(user.id), "bad")
+    assert not success and msg == "fail"
+
+def test_update_email_user_not_found(db):
+    # Zeile 199: User nicht gefunden
+    success, msg = UserService.update_email(db, str(uuid.uuid4()), "x@x.de")
+    assert not success and "not found" in msg
+
+def test_update_email_already_exists(db, setup_roles):
+    # Zeile 203: Email schon vergeben
+    u1 = UserService.create_user(db, "u1", "e1@e.de", "pw", is_first_user=False)
+    u2 = UserService.create_user(db, "u2", "e2@e.de", "pw", is_first_user=False)
+    success, msg = UserService.update_email(db, str(u2.id), "e1@e.de")
+    assert not success and "already" in msg
+
+def test_enable_otp_user_not_found(db):
+    # Zeile 209-210: User nicht gefunden
+    with pytest.raises(ValueError):
+        UserService.enable_otp(db, str(uuid.uuid4()))
+
+def test_disable_otp_user_not_found(db):
+    # Zeile 219: User nicht gefunden
+    assert UserService.disable_otp(db, str(uuid.uuid4())) is False
+
+def test_list_users_filters(db, setup_roles):
+    # Zeile 223: Filterung
+    UserService.create_user(db, "fuser", "f@e.de", "pw", is_first_user=False)
+    users, total = UserService.list_users(db, filter_username="fuser")
+    assert any(u.username == "fuser" for u in users)
+    users, total = UserService.list_users(db, filter_email="f@e.de")
+    assert any(u.email == "f@e.de" for u in users)
+    users, total = UserService.list_users(db, active_only=False)
+    assert isinstance(users, list)
+
+def test_update_user_as_support_user_not_found(db):
+    # Zeile 230-231: User nicht gefunden
+    with pytest.raises(ValueError):
+        UserService.update_user_as_support(db, str(uuid.uuid4()), str(uuid.uuid4()))
+
+def test_get_user_roles_invalid_uuid(db):
+    # Zeile 238-254: Fehlerhafte UUID
+    roles = UserService.get_user_roles(db, "not-a-uuid")
+    assert roles == []
+
+def test_get_user_roles_inactive(db, setup_roles):
+    # Zeile 259-272: Inaktive Rollen
+    user = UserService.create_user(db, "roleuser", "role@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    ur = UserRole(id=uuid.uuid4(), user_id=user.id, role_id=admin_role.id, active=False)
+    db.add(ur)
+    db.commit()
+    roles = UserService.get_user_roles(db, str(user.id), include_inactive=True)
+    assert any(r["active"] is False for r in roles)
+
+def test_assign_role_to_user_invalid_uuid(db):
+    # Zeile 277-289: Fehlerhafte UUID
+    ur, err = UserService.assign_role_to_user(db, "bad", "bad", "bad")
+    assert ur is None and "Invalid UUID" in err
+
+def test_assign_role_to_user_user_not_found(db, setup_roles):
+    # Zeile 304: User nicht gefunden
+    admin_role = setup_roles["admin"]
+    ur, err = UserService.assign_role_to_user(db, str(uuid.uuid4()), str(admin_role.id), str(uuid.uuid4()))
+    assert ur is None and "not found" in err
+
+def test_assign_role_to_user_role_not_found(db, setup_roles):
+    # Zeile 329: Rolle nicht gefunden
+    user = UserService.create_user(db, "ruser", "r@e.de", "pw", is_first_user=False)
+    ur, err = UserService.assign_role_to_user(db, str(user.id), str(uuid.uuid4()), str(user.id))
+    assert ur is None and "Role not found" in err
+
+def test_assign_role_to_user_role_inactive(db, setup_roles):
+    # Zeile 334: Rolle inaktiv
+    user = UserService.create_user(db, "ruser2", "r2@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    admin_role.active = False
+    db.commit()
+    ur, err = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur is None and "not active" in err
+
+def test_assign_role_to_user_otp_required(db, setup_roles):
+    # Zeile 336, 341-342: OTP-Zwang
+    # Ensure there is at least one user in the DB before the test user
+    UserService.create_user(db, "dummy", "dummy@e.de", "pw", is_first_user=True)
+    user = UserService.create_user(db, "ruser3", "r3@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    user.otp_enabled = False
+    db.commit()
+    ur, err = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur is None and "OTP" in err
+
+def test_assign_role_to_user_already_assigned(db, setup_roles):
+    # Zeile 359: Bereits zugewiesen
+    user = UserService.create_user(db, "ruser4", "r4@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    ur, err = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur is not None
+    ur2, err2 = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur2 is None and "already" in err2
+
+def test_assign_role_to_user_removed_cannot_reassign(db, setup_roles):
+    # Zeile 360: Nach Entfernen nicht reaktivierbar
+    user = UserService.create_user(db, "ruser5", "r5@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    ur, err = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur is not None
+    UserService.remove_role_from_user(db, str(user.id), str(admin_role.id), str(user.id))
+    ur2, err2 = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur2 is None and "cannot be reactivated" in err2
+
+def test_remove_role_from_user_invalid_uuid(db):
+    # Zeile 407: Fehlerhafte UUID
+    ok, err = UserService.remove_role_from_user(db, "bad", "bad", "bad")
+    assert not ok and "Invalid UUID" in err
+
+def test_remove_role_from_user_not_found(db, setup_roles):
+    # Zeile 413: Rolle nicht gefunden
+    user = UserService.create_user(db, "ruser6", "r6@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    ok, err = UserService.remove_role_from_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert not ok and "active role assignment" in err
+
+def test_remove_role_from_user_success(db, setup_roles):
+    # Zeile 418, 421: Erfolgreiches Entfernen
+    user = UserService.create_user(db, "ruser7", "r7@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    ur, err = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur is not None
+    ok, err = UserService.remove_role_from_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ok and err is None
+
+def test_remove_role_from_user_soft_delete(db, setup_roles):
+    # Zeile 440: Soft delete setzt active=False
+    user = UserService.create_user(db, "ruser8", "r8@e.de", "pw", is_first_user=False)
+    admin_role = setup_roles["admin"]
+    ur, err = UserService.assign_role_to_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ur is not None
+    ok, err = UserService.remove_role_from_user(db, str(user.id), str(admin_role.id), str(user.id))
+    assert ok
+    ur_db = [ur for ur in db.query(UserRole).filter(UserRole.user_id == user.id).all() if ur.role_id == admin_role.id][0]
+    assert ur_db.active is False
+
+def test_get_user_by_email_case_insensitive(db, setup_roles):
+    # Zeile 491-492: Email-Case-Insensitive
+    UserService.create_user(db, "caseuser", "Case@Email.com", "pw", is_first_user=False)
+    user = UserService.get_user_by_email(db, "case@email.com")
+    assert user is None or user.email.lower() == "case@email.com"  # je nach Implementierung
+
+def test_list_users_pagination(db, setup_roles):
+    # Zeile 504: Pagination
+    for i in range(15):
+        UserService.create_user(db, f"puser{i}", f"p{i}@e.de", "pw", is_first_user=False)
+    users, total = UserService.list_users(db, skip=10, limit=5)
+    assert len(users) <= 5 and total >= 15

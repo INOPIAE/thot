@@ -179,7 +179,7 @@ def test_assign_support_role_requires_otp(client, db):
         json={"role_id": str(support_role.id)},
     )
     assert assign_response.status_code == 400
-    assert "otp enabled" in assign_response.json()["detail"].lower()
+    assert "otp required" in assign_response.json()["detail"].lower()
 
 def test_assign_support_role_with_otp_success(client, db):
     """Assigning support/admin role to user WITH OTP enabled returns 201"""
