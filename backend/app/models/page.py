@@ -4,6 +4,7 @@ Page model
 
 import uuid
 from sqlalchemy import Column, UUID, String, ForeignKey, Text
+import sqlalchemy as sa
 from sqlalchemy.orm import relationship, synonym
 
 from app.database import Base
@@ -32,6 +33,7 @@ class Page(BaseModel):
     location_file_watermark = Column(String(255), nullable=True)  # Path to watermarked file
     restriction_id = Column(UUID(as_uuid=True), ForeignKey("restrictions.id"), nullable=False)
     workstatus_id = Column(UUID(as_uuid=True), ForeignKey("workstatuses.id"), nullable=True)
+    order_by = Column(sa.Integer, nullable=True)
 
     # Relationships
     record = relationship("Record", back_populates="pages")

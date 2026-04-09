@@ -195,7 +195,19 @@ export default {
           limit: 100, // Load all pages for gallery
         })
         // Handle both direct array and paginated response
-        this.pages = Array.isArray(response) ? response : (response.items || [])
+        let pages = Array.isArray(response) ? response : (response.items || [])
+        // Sort by order_by (ascending, fallback to name)
+        this.pages = pages.slice().sort((a, b) => {
+          if (a.order_by != null && b.order_by != null) {
+            return a.order_by - b.order_by
+          } else if (a.order_by != null) {
+            return -1
+          } else if (b.order_by != null) {
+            return 1
+          } else {
+            return (a.name || '').localeCompare(b.name || '')
+          }
+        })
         
         // Load thumbnails for all pages
         this.pages.forEach(page => {

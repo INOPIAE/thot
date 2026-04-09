@@ -159,6 +159,8 @@ class PageService:
         page: str = None,
         comment: str = None,
         location_file: str = None,
+        workstatus_id: str = None,
+        order_by: int = None,
     ) -> Page:
         """Create a new page"""
         new_page = Page(
@@ -169,6 +171,8 @@ class PageService:
             record_id=record_id,
             restriction_id=restriction_id,
             location_file=location_file,
+            workstatus_id=workstatus_id,
+            order_by=order_by,
             created_by=user_id,
             last_modified_by=user_id,
         )

@@ -507,6 +507,9 @@ export const messages = {
       pdfViewerSection: 'Document Viewer',
       unknown: 'Unknown',
       unknownObject: 'Unknown Object',
+      orderBy: 'Sort Order',
+      orderByPlaceholder: 'Sort order of the page within the record (optional)',
+      orderByHelp: 'Pages with lower sort order values are displayed first. If not set, pages are sorted by page name.',
     },
 
     // Home
@@ -1069,6 +1072,9 @@ export const messages = {
       pageCount: 'Gesamtzahl Seiten',
       totalCount: 'Gesamtzahl der Seiten',
       pagingInfo: 'Seite {current} von {total}',
+      orderBy: 'Sortierung',
+      orderByPlaceholder: 'Sortierreihenfolge der Seite innerhalb des Datensatzes (optional)',
+      orderByHelp: 'Seiten mit niedrigeren Sortierreihenfolgewerten werden zuerst angezeigt. Wenn nicht festgelegt, werden die Seiten nach dem Seitennamen sortiert.',
     },
 
     // Home

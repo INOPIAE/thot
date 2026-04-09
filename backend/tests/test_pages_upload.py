@@ -758,3 +758,37 @@ def test_extract_positional_page_number_skips_body_reference(tmp_path, monkeypat
     result = pages_routes._extract_positional_page_number_from_pdf("test.pdf")
 
     assert result is None
+
+
+def test_create_and_get_page_with_order_by(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    user = _create_user_with_role(db, "order_by_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="OrderBy Signature")
+
+    # Erstelle eine Seite mit explizitem order_by
+    response = client.post(
+        "/api/v1/pages",
+        headers=_auth_headers_for_user(user),
+        data={
+            "name": "OrderBy Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+            "order_by": 7,
+        },
+        files={
+            "file": ("orderby.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert "order_by" in payload
+    assert payload["order_by"] == 7
+    page_id = payload["id"]
+
+    # Hole die Seite und prüfe order_by
+    get_response = client.get(f"/api/v1/pages/{page_id}", headers=_auth_headers_for_user(user))
+    assert get_response.status_code == 200
+    get_payload = get_response.json()
+    assert "order_by" in get_payload
+    assert get_payload["order_by"] == 7

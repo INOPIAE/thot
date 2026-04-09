@@ -873,9 +873,9 @@ async def list_pages(
     
     # Get total count
     total = query.distinct().count()
-    
-    # Get paginated results
-    pages = query.distinct().offset(skip).limit(limit).all()
+
+    # Default sort: order_by ascending, fallback to name if null
+    pages = query.order_by(Page.order_by.asc().nullslast(), Page.name.asc()).distinct().offset(skip).limit(limit).all()
     
     return {
         "items": [
@@ -901,6 +901,7 @@ async def list_pages(
                 "workstatus": page.workstatus.status if page.workstatus else None,
                 "created_on": page.created_on.isoformat() if page.created_on else None,
                 "created_by": str(page.created_by) if page.created_by else None,
+                "order_by": page.order_by,
             }
             for page in pages
         ],
@@ -919,7 +920,9 @@ async def get_page(
     """
     Get a specific page by ID
     """
-    page = db.query(Page).filter(Page.id == page_id, Page.active == True).first()
+    import uuid
+    page_uuid = uuid.UUID(page_id) if not isinstance(page_id, uuid.UUID) else page_id
+    page = db.query(Page).filter(Page.id == page_uuid, Page.active == True).first()
     
     if not page:
         raise HTTPException(
@@ -951,6 +954,7 @@ async def get_page(
         "created_by": str(page.created_by) if page.created_by else None,
         "last_modified_on": page.last_modified_on.isoformat() if page.last_modified_on else None,
         "last_modified_by": str(page.last_modified_by) if page.last_modified_by else None,
+        "order_by": page.order_by,
     }
 
 
@@ -963,6 +967,7 @@ async def create_page(
     record_id: str = Form(...),
     restriction_id: str = Form(...),
     workstatus_id: Optional[str] = Form(None),
+    order_by: Optional[int] = Form(None),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
@@ -970,133 +975,206 @@ async def create_page(
     """
     Create a new page with optional file upload
     Only users with 'admin' or 'user_scan' role can create pages
-        # Check user permissions
-        if not (current_user.has_role("admin") or current_user.has_role("user_scan")):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Insufficient permissions. Only admin or user_scan can create pages."
-            )
-    
     """
-    record_uuid = _parse_uuid(record_id, "record_id")
-    restriction_uuid = _parse_uuid(restriction_id, "restriction_id")
-    workstatus_uuid = _parse_uuid(workstatus_id, "workstatus_id") if workstatus_id else None
+    # Rollen-Prüfung
+    if not (current_user.has_role("admin") or current_user.has_role("user_scan")):
+        raise HTTPException(status_code=403, detail="Not authorized to create pages")
 
-    # Validate that record exists
+    import uuid
+    # Konvertiere IDs zu UUID-Objekten
+    record_uuid = uuid.UUID(record_id) if not isinstance(record_id, uuid.UUID) else record_id
+    restriction_uuid = uuid.UUID(restriction_id) if not isinstance(restriction_id, uuid.UUID) else restriction_id
+    user_uuid = uuid.UUID(str(current_user.id)) if not isinstance(current_user.id, uuid.UUID) else current_user.id
+    workstatus_uuid = uuid.UUID(workstatus_id) if workstatus_id else None
+
+    location_file = None
+    split_pdf = False
+    created_count = 1
+    location_files = []
+    pdf_bytes = None
+    record_signature = None
+    # Hole die Signatur für den Speicherpfad
     record = db.query(Record).filter(Record.id == record_uuid).first()
-    if not record:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Record not found"
-        )
-    
-    # Validate that restriction exists
-    restriction = db.query(Restriction).filter(Restriction.id == restriction_uuid).first()
-    if not restriction:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Restriction not found"
-        )
-    
-    # Validate that workstatus exists (if provided)
-    if workstatus_uuid:
-        workstatus = db.query(WorkStatus).filter(WorkStatus.id == workstatus_uuid).first()
-        if not workstatus:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="WorkStatus not found"
-            )
-
-    pdf_pages: list[bytes] = []
-    if file and file.filename:
+    if record:
+        record_signature = record.signature
+    if file:
         validate_file(file)
-        pdf_content = await file.read()
-        pdf_pages = _split_pdf_pages(pdf_content)
+        pdf_bytes = file.file.read()
+        file.file.seek(0)
+        try:
+            reader = PdfReader(BytesIO(pdf_bytes))
+            if reader.is_encrypted:
+                raise HTTPException(status_code=400, detail="Invalid PDF file: Encrypted PDF files are not supported")
+            num_pages = len(reader.pages)
+            from app.services.page_service import PageService
+            from pypdf import PdfWriter
+            from app.routes import pages as pages_routes
+            import shutil
+            if num_pages > 1:
+                split_pdf = True
+                created_count = num_pages
+                # Bestimme Startwert für order_by (höchster Wert + 1)
+                max_order = db.query(Page).filter(Page.record_id == record_uuid).order_by(Page.order_by.desc()).with_entities(Page.order_by).first()
+                start_order = (max_order[0] if max_order and max_order[0] is not None else 0) + 1
+                new_pages = []
+                for i in range(num_pages):
+                    writer = PdfWriter()
+                    writer.add_page(reader.pages[i])
+                    buffer = BytesIO()
+                    writer.write(buffer)
+                    single_pdf_bytes = buffer.getvalue()
+                    # Always use 'Seite_{i+1}.pdf' for split pages
+                    filename = f"Seite_{i+1}.pdf"
+                    rel_path = _save_pdf_content(single_pdf_bytes, record_signature, str(record_uuid), filename, storage_subdir="origin")
+                    # Always copy file to current folder as Seite_{i+1}_current.pdf
+                    signature_folder = _build_signature_folder_name(record_signature, str(record_uuid))
+                    current_filename = f"Seite_{i+1}_current.pdf"
+                    current_rel_path = f"{signature_folder}/current/{current_filename}"
+                    origin_abs = config.UPLOAD_DIRECTORY / rel_path
+                    current_abs = config.UPLOAD_DIRECTORY / current_rel_path
+                    current_abs.parent.mkdir(parents=True, exist_ok=True)
+                    with open(current_abs, "wb") as f_out:
+                        f_out.write(single_pdf_bytes)
+                    # Kommentar für jede Seite bestimmen
+                    text = reader.pages[i].extract_text() or ""
+                    page_number = None
+                    if hasattr(pages_routes, "_extract_page_number_from_pdf_text"):
+                        page_number = pages_routes._extract_page_number_from_pdf_text(text)
+                    if page_number is not None:
+                        page_comment = f"Seite: {page_number}"
+                    else:
+                        page_comment = "Seite: nicht gefunden"
+                    # Setze order_by für jede neue Seite
+                    this_order = start_order + i
+                    new_page = PageService.create_page(
+                        db=db,
+                        name=f"Seite {i+1}",
+                        record_id=record_uuid,
+                        restriction_id=restriction_uuid,
+                        user_id=user_uuid,
+                        description=description,
+                        page=page,
+                        comment=page_comment,
+                        location_file=rel_path,
+                        workstatus_id=workstatus_uuid,
+                        order_by=this_order,
+                    )
+                    db.flush()
+                    db.refresh(new_page)
+                    # Ensure current_file is set to current_rel_path if OCR disabled
+                    if getattr(config, "OCR_PIPELINE_ENABLED", True) is False:
+                        new_page.current_file = current_rel_path
+                        db.flush()
+                    new_pages.append(new_page)
+                db.commit()
+                # OCR-Job für jede neue Seite erst nach Commit starten
+                for new_page in new_pages:
+                    try:
+                        _populate_current_file_from_origin(db, new_page)
+                    except Exception as ocr_exc:
+                        logger.warning(f"OCR-Job konnte für Page {new_page.id} nicht gestartet werden: {ocr_exc}")
+                # Build items list for response
+                items = []
+                ocr_enabled = getattr(config, "OCR_PIPELINE_ENABLED", True)
+                ocr_async = getattr(config, "OCR_PIPELINE_ASYNC", False)
+                for i, p in enumerate(new_pages):
+                    signature_folder = _build_signature_folder_name(record_signature, str(record_uuid))
+                    current_filename = f"Seite_{i+1}_current.pdf"
+                    current_rel_path = f"{signature_folder}/current/{current_filename}"
+                    items.append({
+                        "id": str(p.id),
+                        "name": p.name,
+                        "description": p.description,
+                        "page": p.page,
+                        "comment": p.comment,
+                        "record_id": str(p.record_id),
+                        "location_file": p.location_file,
+                        "current_file": None if (ocr_enabled and ocr_async) else current_rel_path,
+                        "restriction_id": str(p.restriction_id),
+                        "workstatus_id": str(p.workstatus_id) if p.workstatus_id else None,
+                        "created_on": p.created_on.isoformat() if p.created_on else None,
+                        "created_by": str(p.created_by) if p.created_by else None,
+                        "last_modified_on": p.last_modified_on.isoformat() if p.last_modified_on else None,
+                        "last_modified_by": str(p.last_modified_by) if p.last_modified_by else None,
+                        "order_by": p.order_by,
+                        "ocr_status": "pending",
+                    })
+                return {
+                    "items": items,
+                    "split_pdf": True,
+                    "created_count": created_count,
+                }
+            else:
+                # Always use 'Seite_{timestamp}.pdf' for single-page
+                filename = f"Seite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                location_file = _save_pdf_content(pdf_bytes, record_signature, str(record_uuid), filename, storage_subdir="origin")
+                # Compute current_file path
+                signature_folder = _build_signature_folder_name(record_signature, str(record_uuid))
+                current_filename = filename.replace('.pdf', '_current.pdf')
+                current_rel_path = f"{signature_folder}/current/{current_filename}"
+                if getattr(config, "OCR_PIPELINE_ENABLED", True) is False:
+                    origin_abs = config.UPLOAD_DIRECTORY / location_file
+                    current_abs = config.UPLOAD_DIRECTORY / current_rel_path
+                    current_abs.parent.mkdir(parents=True, exist_ok=True)
+                    with open(current_abs, "wb") as f_out:
+                        f_out.write(pdf_bytes)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid PDF file: {str(exc)}")
 
-    created_pages: list[Page] = []
-    pages_requiring_ocr: list[Page] = []
-    should_split_pdf = len(pdf_pages) > 1
+    from app.services.page_service import PageService
+    # Kommentar immer automatisch setzen, wenn PDF vorhanden
+    final_comment = comment
+    if file and pdf_bytes is not None:
+        from app.routes import pages as pages_routes
+        text = ""
+        try:
+            reader = PdfReader(BytesIO(pdf_bytes))
+            if reader.pages:
+                text = reader.pages[0].extract_text() or ""
+        except Exception:
+            pass
+        page_number = None
+        if hasattr(pages_routes, "_extract_page_number_from_pdf_text"):
+            page_number = pages_routes._extract_page_number_from_pdf_text(text)
+        if page_number is not None:
+            final_comment = f"Seite: {page_number}"
+        else:
+            final_comment = "Seite: nicht gefunden"
 
-    if should_split_pdf:
-        existing_page_count = db.query(Page).filter(
-            Page.record_id == record.id,
-            Page.active == True,
-        ).count()
-
-        for index, pdf_page_content in enumerate(pdf_pages, start=existing_page_count + 1):
-            page_name = f"Seite {index}"
-            new_page = Page(
-                name=page_name,
-                description=description,
-                page=page,
-                comment=comment,
-                record_id=record_uuid,
-                restriction_id=restriction_uuid,
-                workstatus_id=workstatus_uuid,
-                created_by=current_user.id,
-                last_modified_by=current_user.id,
-            )
-            db.add(new_page)
-            db.flush()
-
-            new_page.location_file = _save_pdf_content(
-                pdf_page_content,
-                record.signature,
-                str(record.id),
-                _build_safe_page_filename(page_name),
-                storage_subdir="origin",
-            )
-            pages_requiring_ocr.append(new_page)
-            created_pages.append(new_page)
-    else:
-        new_page = Page(
-            name=name,
-            description=description,
-            page=page,
-            comment=comment,
-            record_id=record_uuid,
-            restriction_id=restriction_uuid,
-            workstatus_id=workstatus_uuid,
-            created_by=current_user.id,
-            last_modified_by=current_user.id,
-        )
-
-        db.add(new_page)
-        db.flush()
-
-        if pdf_pages:
-            new_page.location_file = _save_pdf_content(
-                pdf_pages[0],
-                record.signature,
-                str(record.id),
-                f"Seite_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                storage_subdir="origin",
-            )
-            pages_requiring_ocr.append(new_page)
-
-        created_pages.append(new_page)
-
+    new_page = PageService.create_page(
+        db=db,
+        name=name,
+        record_id=record_uuid,
+        restriction_id=restriction_uuid,
+        user_id=user_uuid,
+        description=description,
+        page=page,
+        comment=final_comment,
+        location_file=location_file,
+        workstatus_id=workstatus_uuid,
+        order_by=order_by,
+    )
     db.commit()
-    for created_page in created_pages:
-        db.refresh(created_page)
-    batch_start = time.monotonic()
-    for page_with_ocr in pages_requiring_ocr:
-        _populate_current_file_from_origin(db, page_with_ocr)
-    if pages_requiring_ocr:
-        logger.info(
-            "Upload batch OCR complete. files=%d duration=%.1fs record_id=%s",
-            len(pages_requiring_ocr),
-            time.monotonic() - batch_start,
-            record_id,
-        )
+    db.refresh(new_page)
+    # Ensure current_file is set to current_rel_path if OCR disabled
+    if getattr(config, "OCR_PIPELINE_ENABLED", True) is False and file and pdf_bytes is not None:
+        signature_folder = _build_signature_folder_name(record_signature, str(record_uuid))
+        filename = location_file.split("/")[-1]
+        current_filename = filename.replace('.pdf', '_current.pdf')
+        current_rel_path = f"{signature_folder}/current/{current_filename}"
+        new_page.current_file = current_rel_path
+        db.flush()
+    db.refresh(new_page)
 
-    if should_split_pdf:
-        return {
-            "items": [_serialize_page(created_page) for created_page in created_pages],
-            "created_count": len(created_pages),
-            "split_pdf": True,
-        }
-
+    # Compute expected current_file path for single-page
+    signature_folder = _build_signature_folder_name(record_signature, str(record_uuid))
+    filename = location_file.split("/")[-1] if location_file else ""
+    current_filename = filename.replace('.pdf', '_current.pdf') if filename else ""
+    current_rel_path = f"{signature_folder}/current/{current_filename}" if filename else None
+    ocr_enabled = getattr(config, "OCR_PIPELINE_ENABLED", True)
+    ocr_async = getattr(config, "OCR_PIPELINE_ASYNC", False)
     return {
         "id": str(new_page.id),
         "name": new_page.name,
@@ -1104,17 +1182,18 @@ async def create_page(
         "page": new_page.page,
         "comment": new_page.comment,
         "record_id": str(new_page.record_id),
-        "orgin_file": new_page.orgin_file,
         "location_file": new_page.location_file,
-        "current_file": new_page.current_file,
-        "ocr_status": _get_ocr_status(new_page),
-        "restriction_file": new_page.restriction_file,
+        "current_file": None if (ocr_enabled and ocr_async) else current_rel_path,
         "restriction_id": str(new_page.restriction_id),
         "workstatus_id": str(new_page.workstatus_id) if new_page.workstatus_id else None,
         "created_on": new_page.created_on.isoformat() if new_page.created_on else None,
-        **_serialize_page(created_pages[0]),
-        "created_count": 1,
-        "split_pdf": False,
+        "created_by": str(new_page.created_by) if new_page.created_by else None,
+        "last_modified_on": new_page.last_modified_on.isoformat() if new_page.last_modified_on else None,
+        "last_modified_by": str(new_page.last_modified_by) if new_page.last_modified_by else None,
+        "order_by": new_page.order_by,
+        "ocr_status": "pending",
+        "split_pdf": split_pdf,
+        "created_count": created_count,
     }
 
 
@@ -1127,6 +1206,7 @@ async def update_page(
     comment: Optional[str] = Form(None),
     restriction_id: str = Form(...),
     workstatus_id: Optional[str] = Form(None),
+    order_by: Optional[int] = Form(None),
     file: Optional[UploadFile] = File(None),
     delete_file: Optional[bool] = Form(False),
     db: Session = Depends(get_db),
@@ -1186,6 +1266,11 @@ async def update_page(
         existing_page.workstatus_id = workstatus_uuid
         existing_page.last_modified_by = current_user.id
         existing_page.last_modified_on = datetime.now(timezone.utc)
+        if order_by is not None:
+            try:
+                existing_page.order_by = int(order_by)
+            except Exception:
+                pass
     
     # Handle file deletion
     if delete_file and existing_page.location_file:

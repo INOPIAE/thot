@@ -48,6 +48,7 @@
         />
       </div>
 
+
       <div class="form-group">
         <label for="comment">{{ $t('pages.comment') }}</label>
         <textarea
@@ -58,6 +59,19 @@
           :disabled="isUploadOnlyMode"
           rows="3"
         />
+      </div>
+
+      <div class="form-group" v-if="canEditPage">
+        <label for="order_by">{{ $t('pages.orderBy') }}</label>
+        <input
+          id="order_by"
+          v-model.number="form.order_by"
+          type="number"
+          min="1"
+          class="form-control"
+          :placeholder="$t('pages.orderByPlaceholder')"
+        />
+        <small class="form-text text-muted">{{ $t('pages.orderByHelp') }}</small>
       </div>
 
       <div class="form-row">
@@ -145,6 +159,7 @@ export default {
         comment: '',
         restriction_id: '',
         workstatus_id: '',
+        order_by: null,
         delete_file: false,
       },
     }
@@ -210,6 +225,7 @@ export default {
         this.form.comment = page.comment || ''
         this.form.restriction_id = page.restriction_id || ''
         this.form.workstatus_id = page.workstatus_id || ''
+        this.form.order_by = page.order_by !== undefined && page.order_by !== null ? page.order_by : null
         this.hasCurrentFile = !!page.location_file
       } catch (err) {
         this.error = err.message || this.$t('pages.loadError')
@@ -266,6 +282,7 @@ export default {
           record_id: this.recordId,
           restriction_id: this.form.restriction_id,
           workstatus_id: this.form.workstatus_id || null,
+          order_by: this.form.order_by,
           file: this.selectedFile,
         }
 
