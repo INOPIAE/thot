@@ -42,6 +42,29 @@ h1, h2, h3, h4, h5, h6 {
   margin-bottom: 1rem;
 }
 
+/* ========================================
+   Legal-Pages: Listen-Layout
+   ======================================== */
+.legal-html ul,
+.legal-html ol {
+  margin-left: 2rem;
+  padding-left: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+
+.legal-html ul ul,
+.legal-html ol ol,
+.legal-html ul ol,
+.legal-html ol ul {
+  margin-left: 1.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.legal-html li {
+  margin-bottom: 0.5rem;
+  list-style-position: outside;
+}
+
 h1 {
   font-size: 2.5rem;
   font-weight: 700;

@@ -49,16 +49,3 @@ export default defineComponent({
   },
 })
 </script>
-
-<style scoped>
-.legal-html :deep(h1),
-.legal-html :deep(h2),
-.legal-html :deep(h3) {
-  margin-top: 1rem;
-}
-
-.legal-html :deep(p),
-.legal-html :deep(li) {
-  line-height: 1.5;
-}
-</style>

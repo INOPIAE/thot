@@ -10,12 +10,7 @@
       <div v-else-if="error">
         {{ error }}
       </div>
-      <iframe
-        v-else
-        class="legal-frame"
-        :srcdoc="htmlContent"
-        :title="$t('common.termsOfService')"
-      />
+        <article v-else class="legal-html" v-html="htmlContent"></article>
     </div>
   </div>
 </template>
@@ -59,10 +54,3 @@ export default defineComponent({
 })
 </script>
 
-<style scoped>
-.legal-frame {
-  width: 100%;
-  min-height: 60vh;
-  border: 0;
-}
-</style>
