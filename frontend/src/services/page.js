@@ -1,10 +1,17 @@
-/**
- * Service for Pages API calls
- */
-
 import api from './api'
 
 export const pageService = {
+  /**
+   * Start OCR job for a page
+   */
+  async startOcr(pageId) {
+    try {
+      const response = await api.post(`/pages/${pageId}/start-ocr`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
   /**
    * Get all pages (optionally filtered by record_id)
    */

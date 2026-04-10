@@ -1,3 +1,6 @@
+
+
+
 """
 Pages API routes
 """
@@ -30,6 +33,41 @@ from config import config
 
 router = APIRouter(prefix="/pages", tags=["pages"])
 logger = logging.getLogger(__name__)
+
+
+# OCR-Job manuell starten
+
+@router.post("/{page_id}/start-ocr")
+async def start_ocr_job(
+    page_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """
+    Manually start OCR job for a page (admin/user_scan only)
+    """
+    if not (current_user.has_role("admin") or current_user.has_role("user_scan")):
+        raise HTTPException(status_code=403, detail="Not authorized to start OCR job")
+
+    import uuid
+    try:
+        page_uuid = uuid.UUID(page_id) if not isinstance(page_id, uuid.UUID) else page_id
+    except Exception:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    page = db.query(Page).filter(Page.id == page_uuid, Page.active == True).first()
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    if not page.orgin_file:
+        raise HTTPException(status_code=400, detail="No origin file for this page")
+
+    try:
+        PageOcrJobService.schedule_page_ocr(page_id=str(page.id), record_id=str(page.record_id) if page.record_id else None)
+    except Exception as exc:
+        logger.exception("Failed to start OCR job")
+        raise HTTPException(status_code=500, detail=f"Failed to start OCR job: {str(exc)}")
+
+    return {"message": "OCR job started"}
 
 ALLOWED_PDF_CONTENT_TYPES = {
     "application/pdf",

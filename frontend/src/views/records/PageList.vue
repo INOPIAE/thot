@@ -105,6 +105,12 @@
                 {{ page.workstatus }}
               </span>
             </div>
+            <div v-if="page.ocr_status !== 'completed'" class="ocr-warning mt-2">
+              <span class="badge badge-warning">OCR ausstehend</span>
+              <button v-if="canManageOcr()" class="btn btn-sm btn-warning ml-2" @click="startOcr(page.id)">
+                OCR starten
+              </button>
+            </div>
           </div>
           <div class="page-card-footer">
             <small v-if="page.created_on" class="text-muted">
@@ -208,6 +214,19 @@ export default {
     },
   },
   methods: {
+    canManageOcr() {
+      // Admins und user_scan dürfen OCR starten
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
+    },
+    async startOcr(pageId) {
+      try {
+        await pageService.startOcr(pageId)
+        this.successMessage = 'OCR-Job wurde gestartet.'
+        await this.loadPages()
+      } catch (err) {
+        this.error = err.message || 'Fehler beim Starten des OCR-Jobs.'
+      }
+    },
     async loadRecordTitle() {
       try {
         const record = await recordService.getRecord(this.recordId)
