@@ -56,15 +56,13 @@ export default defineComponent({
 
 <style scoped>
 .app-header {
+
   background-color: var(--color-header-footer-bg);
   color: var(--color-header-footer-text);
   padding: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
-  max-width: 1200px;
-  margin: 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;

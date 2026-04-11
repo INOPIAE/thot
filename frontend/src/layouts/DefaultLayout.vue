@@ -31,6 +31,7 @@ export default defineComponent({
 </script>
 
 <style scoped>
+
 #app-layout {
   display: flex;
   flex-direction: column;
@@ -40,8 +41,6 @@ export default defineComponent({
 .app-main {
   display: flex;
   flex: 1;
-  max-width: 1200px;
-  margin: 0 auto;
   width: 100%;
 }
 

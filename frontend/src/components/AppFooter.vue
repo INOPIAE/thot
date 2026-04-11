@@ -66,8 +66,6 @@ export default defineComponent({
 }
 
 .footer-content {
-  max-width: 1200px;
-  margin: 0 auto;
   display: flex;
   justify-content: space-between;
 }
