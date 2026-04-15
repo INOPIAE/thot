@@ -25,12 +25,14 @@
         </ul>
       </li>
 
-      <!-- Records Section (Authenticated) -->
-      <li v-if="authStore.isAuthenticated" class="nav-section">
-        <span class="nav-label">{{ t('nav.records') }}</span>
+
+      <!-- Objekte Section (sichtbar für alle, aber Unterpunkte je nach Zustand) -->
+      <li v-if="authStore.isAuthenticated || showObjektlisteDefault" class="nav-section">
+        <span class="nav-label">Objekte</span>
         <ul>
-          <li><router-link to="/records" @click="closeMenu">{{ t('nav.recordList') }}</router-link></li>
-          <li v-if="authStore.hasRole('admin') || authStore.hasRole('user_bibl')">
+          <li v-if="authStore.isAuthenticated"><router-link to="/records" @click="closeMenu">{{ t('nav.recordList') }}</router-link></li>
+          <li v-if="showObjektlisteDefault"><router-link to="/records-default" @click="closeMenu">Objektliste Default</router-link></li>
+          <li v-if="authStore.isAuthenticated && (authStore.hasRole('admin') || authStore.hasRole('user_bibl'))">
             <router-link to="/records/new" @click="closeMenu">{{ t('nav.createRecord') }}</router-link>
           </li>
         </ul>
@@ -105,6 +107,11 @@ export default defineComponent({
         && (authStore.hasRole('support') || authStore.hasRole('admin'))
     )
 
+    const showObjektlisteDefault = computed(() => {
+      if (!appStore.isConfigLoaded) return false
+      const publicUse = appStore.config?.PUBLIC_USE ?? appStore.config?.features?.publicUse ?? false
+      return publicUse || authStore.isAuthenticated
+    })
     return {
       authStore,
       appStore,
@@ -112,6 +119,7 @@ export default defineComponent({
       t,
       showPublicRegisterLink,
       showPrivilegedRegisterLink,
+      showObjektlisteDefault,
     }
   },
   data() {

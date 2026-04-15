@@ -1,3 +1,4 @@
+import { fetchAppConfig } from '@/services/config'
 /**
  * Vue Router Configuration
  */
@@ -9,6 +10,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
+      // Objektliste Default (PUBLIC_USE abhängig)
+      {
+        path: '/records-default',
+        name: 'RecordListDefault',
+        component: () => import('@/views/records/RecordListDefault.vue'),
+        meta: { requiresAuth: false, publicUseDynamic: true }, // will be set at runtime
+      },
     {
       path: '/auth/email-reset/confirm/:token',
       name: 'EmailResetConfirm',

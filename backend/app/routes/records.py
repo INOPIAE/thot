@@ -22,6 +22,8 @@ from app.schemas import (
     RecordDetailResponse,
     RecordListResponse,
     RecordListItemResponse,
+    RecordListDefaultResponse,
+    RecordListDefaultItemResponse,
     RecordReducedResponse,
     RecordAuthorResponse,
     RecordConditionResponse,
@@ -30,7 +32,7 @@ from app.schemas import (
     PublicationTypeResponse,
     PublisherResponse,
 )
-from app.utils.auth import get_current_user
+from app.utils.auth import get_current_user, optional_user
 from app.utils.phonetics import generate_phonetic_codes
 from config import config
 from typing import Optional, List
@@ -160,7 +162,7 @@ def parse_optional_date(value: Optional[str], field_name: str):
 @router.get("", response_model=RecordListResponse)
 async def list_records(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
+    current_user = Depends(optional_user),
     title: Optional[str] = Query(None, description="Search by title"),
     signature: Optional[str] = Query(None, description="Search by signature"),
     keywords_names: Optional[str] = Query(None, description="Search by keywords names (comma-separated)"),
@@ -232,7 +234,15 @@ async def list_records(
                 signature=record.signature,
                 comment=record.comment,
                 loantype=record.loantype.loan if record.loantype else None,
-                loantype_subtype=(record.loantype.subtype if (record.loantype and (current_user.has_role("admin") or current_user.has_role("user_bibl"))) else None),
+                loantype_subtype=(
+                    record.loantype.subtype
+                    if (
+                        record.loantype and current_user is not None and (
+                            current_user.has_role("admin") or current_user.has_role("user_bibl")
+                        )
+                    )
+                    else None
+                ),
                 restriction_id=record.restriction_id,
                 restriction=record.restriction.name if record.restriction else None,
                 workstatus_id=record.workstatus_id,
@@ -254,6 +264,105 @@ async def list_records(
         "skip": skip,
         "limit": limit,
     }
+
+@router.get("/defaultlist", response_model=RecordListDefaultResponse)
+async def list_records_default(
+    db: Session = Depends(get_db),
+    current_user = Depends(optional_user),
+    title: Optional[str] = Query(None, description="Search by title"),
+    signature: Optional[str] = Query(None, description="Search by signature"),
+    keywords_names: Optional[str] = Query(None, description="Search by keywords names (comma-separated)"),
+    keywords_locations: Optional[str] = Query(None, description="Search by keywords locations (comma-separated)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
+):
+    """
+    List all records with optional search filters
+    Supports multiple keywords in names and locations (comma-separated)
+    """
+    from sqlalchemy.orm import joinedload
+    
+    # Base query with eager loading of relationships
+    query = db.query(Record).filter(Record.active == True, Record.sort_out_date.is_(None))
+    
+    # Eagerly load keywords relationships to avoid N+1 queries
+    query = query.options(
+        joinedload(Record.keywords_names),
+        joinedload(Record.keywords_locations),
+        joinedload(Record.record_authors).joinedload(RecordAuthor.author),
+        joinedload(Record.publisher)
+    )
+
+    if title:
+        query = query.filter(Record.title.ilike(f"%{title}%"))
+
+    if signature:
+        query = query.filter(Record.signature.ilike(f"%{signature}%"))
+
+    # Search by keywords_names - use subquery to avoid affecting main results
+    if keywords_names:
+        keyword_list = [kw.strip() for kw in keywords_names.split(",") if kw.strip()]
+        if keyword_list:
+            # Subquery to find record IDs that have matching keywords (case-insensitive, partial match)
+            from sqlalchemy import or_
+            keyword_conditions = [KeywordName.name.ilike(f"%{kw}%") for kw in keyword_list]
+            subquery = db.query(Record.id).join(Record.keywords_names).filter(
+                or_(*keyword_conditions)
+            ).subquery()
+            query = query.filter(Record.id.in_(subquery))
+
+    # Search by keywords_locations - use subquery to avoid affecting main results
+    if keywords_locations:
+        keyword_list = [kw.strip() for kw in keywords_locations.split(",") if kw.strip()]
+        if keyword_list:
+            # Subquery to find record IDs that have matching keywords (case-insensitive, partial match)
+            from sqlalchemy import or_
+            keyword_conditions = [KeywordLocation.name.ilike(f"%{kw}%") for kw in keyword_list]
+            subquery = db.query(Record.id).join(Record.keywords_locations).filter(
+                or_(*keyword_conditions)
+            ).subquery()
+            query = query.filter(Record.id.in_(subquery))
+
+    # Get total count
+    total = query.distinct().count()
+
+    # Get paginated results, sorted by signature ascending, then title
+    records = query.distinct().order_by(Record.signature.asc(), Record.title.asc()).offset(skip).limit(limit).all()
+
+    return {
+        "items": [
+            RecordListDefaultItemResponse(
+                id=record.id,
+                title=record.title,
+                description=record.description,
+                signature=record.signature,
+                comment=record.comment,
+                loantype=record.loantype.loan if record.loantype else None,
+                loantype_subtype=(
+                    record.loantype.subtype
+                    if (
+                        record.loantype and current_user is not None and (
+                            current_user.has_role("admin") or current_user.has_role("user_bibl")
+                        )
+                    )
+                    else None
+                ),
+                keywords_names=", ".join(sorted([kw.name for kw in record.keywords_names])) if record.keywords_names else "",
+                keywords_locations=", ".join(sorted([kw.name for kw in record.keywords_locations])) if record.keywords_locations else "",
+                authors="; ".join([f"{ra.author.last_name}{', ' + ra.author.first_name if ra.author.first_name else ''}" for ra in sorted(record.record_authors, key=lambda x: x.order or 0)] if record.record_authors else []),
+                publisher=f"{record.publisher.companyname}{' (' + record.publisher.town + ')' if record.publisher.town else ''}" if record.publisher else "",
+                page_count=db.query(func.count(Page.id)).filter(
+                    Page.record_id == record.id,
+                    Page.active == True
+                ).scalar() or 0,
+            )
+            for record in records
+        ],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
 
 
 @router.get("/reduced", response_model=List[RecordReducedResponse])

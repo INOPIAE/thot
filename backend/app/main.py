@@ -3,10 +3,12 @@ Main application entry point.
 This module is responsible for loading routes and starting the FastAPI app.
 """
 
-from app import app
+from app import create_app
 from app.routes.api import api_router
 
-# Include API routers after app is created
+app = create_app()
+
+# Router registrieren
 app.include_router(api_router)
 
 if __name__ == "__main__":

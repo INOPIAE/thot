@@ -42,6 +42,7 @@ async def get_app_config(db: Session = Depends(get_db)):
             "corporateApprovals": config.FEATURE_CORPORATE_APPROVALS_ENABLED,
             "closedRegistration": closed_registration_effective,
             "closedRegistrationConfigured": config.CLOSED_REGISTRATION,
+            "publicUse": config.PUBLIC_USE,
         },
         # Languages
         "languages": {

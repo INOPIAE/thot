@@ -96,9 +96,13 @@ async def health_check():
     }
 
 
-# NOTE: Router imports are deferred to avoid circular imports and schema
-# resolution issues during module initialization. They are loaded only
-# when the app is actually run (see app/main.py).
+
+# Factory-Funktion für FastAPI-App
+def create_app():
+    """Factory for FastAPI app (for testing/ASGI server imports)"""
+    return app
+
+# NOTE: Router imports sind weiterhin deferred, siehe main.py.
 
 if __name__ == "__main__":
     import uvicorn
