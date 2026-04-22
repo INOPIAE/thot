@@ -70,6 +70,18 @@ export const recordService = {
   },
 
   /**
+   * Resolve frontend public link token (/pdf/:encodedId) to a record id.
+   */
+  async resolvePublicRecordPdfLink(encodedId) {
+    try {
+      const response = await api.get(`/public-links/pdf/${encodedId}`)
+      return response.data
+    } catch (error) {
+      throw error.response?.data || error
+    }
+  },
+
+  /**
    * Create a new record
    */
   async createRecord(data) {

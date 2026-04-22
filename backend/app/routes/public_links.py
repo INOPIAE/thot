@@ -96,3 +96,33 @@ async def resolve_public_record_link(
         "target_api_url": f"/api/v1/records/{record.id}",
         "frontend_record_path": f"/records/{record.id}",
     }
+
+
+@router.get("/pdf/{encoded_id}")
+async def resolve_public_record_pdf_link(
+    encoded_id: str,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Resolve base62 record id used in frontend public links (/pdf/{id})."""
+    try:
+        record_uuid = decode_base62_to_uuid(encoded_id)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    record = db.query(Record).filter(Record.id == record_uuid, Record.active == True).first()
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Record not found",
+        )
+
+    return {
+        "record_id": str(record.id),
+        "encoded_record_id": encoded_id,
+        "target_api_url": f"/api/v1/records/{record.id}/pages-gallery",
+        "frontend_record_path": f"/records/{record.id}/pages-gallery",
+    }

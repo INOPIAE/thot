@@ -834,6 +834,10 @@ async def download_watermarked_pdf(
             detail="No PDF file available for this page",
         )
 
+    restriction_message = ""
+    if page.record.restriction_id and page.record.restriction_id != uuid.UUID("00000000-0000-0000-0000-000000000001"):
+        restriction_message = "Restricted"
+
     source_pdf_path = (config.UPLOAD_DIRECTORY / pdf_file).resolve()
     if not source_pdf_path.exists() or not source_pdf_path.is_file():
         raise HTTPException(
@@ -843,6 +847,7 @@ async def download_watermarked_pdf(
 
     try:
         from app.services.pdf_watermark_service import create_watermarked_pdf
+        from app.utils.public_links import build_record_public_url_pdf
 
         watermark_bytes = create_watermarked_pdf(
             source_pdf=source_pdf_path,
@@ -850,8 +855,11 @@ async def download_watermarked_pdf(
             downloaded_at=datetime.now(),
             record_name=page.record.title if page.record else None,
             record_signature=page.record.signature if page.record else None,
-            page_text=page.page,
+            record_pdf_url=build_record_public_url_pdf(page.record.id) if page.record else None,
+            page_text=page.name,
             watermark_image_path=config.get_watermark_image_path(),
+            watermark_copyright=config.WATERMARK_COPYRIGHT,
+            restriction_message=restriction_message,
         )
     except Exception as exc:
         raise HTTPException(
@@ -860,7 +868,7 @@ async def download_watermarked_pdf(
         )
 
     filename_stem = Path(pdf_file).stem
-    download_name = f"{filename_stem}_watermarked.pdf"
+    download_name = f"{filename_stem}.pdf"
 
     return Response(
         content=watermark_bytes,
@@ -907,8 +915,13 @@ async def view_watermarked_pdf(
             detail="Source PDF file not found on server",
         )
 
+    restriction_message = ""
+    if page.record.restriction_id and page.record.restriction_id != uuid.UUID("00000000-0000-0000-0000-000000000001"):
+        restriction_message = "Restricted"
+
     try:
         from app.services.pdf_watermark_service import create_watermarked_pdf
+        from app.utils.public_links import build_record_public_url_pdf
 
         watermark_bytes = create_watermarked_pdf(
             source_pdf=source_pdf_path,
@@ -916,8 +929,11 @@ async def view_watermarked_pdf(
             downloaded_at=datetime.now(),
             record_name=page.record.title if page.record else None,
             record_signature=page.record.signature if page.record else None,
-            page_text=page.page,
+            record_pdf_url=build_record_public_url_pdf(page.record.id) if page.record else None,
+            page_text=page.name,
             watermark_image_path=config.get_watermark_image_path(),
+            watermark_copyright=config.WATERMARK_COPYRIGHT,
+            restriction_message=restriction_message,
         )
     except Exception as exc:
         raise HTTPException(
@@ -926,7 +942,7 @@ async def view_watermarked_pdf(
         )
 
     filename_stem = Path(pdf_file).stem
-    view_name = f"{filename_stem}_watermarked.pdf"
+    view_name = f"{filename_stem}.pdf"
 
     return Response(
         content=watermark_bytes,
@@ -983,8 +999,9 @@ async def get_thumbnail_with_watermark(
             downloaded_at=datetime.now(),
             record_name=page.record.title if page.record else None,
             record_signature=page.record.signature if page.record else None,
-            page_text=page.page,
+            page_text=page.name,
             watermark_image_path=config.get_watermark_image_path(),
+            watermark_copyright=config.WATERMARK_COPYRIGHT,
             thumbnail_width=width,
         )
     except Exception as exc:
@@ -1009,7 +1026,7 @@ async def list_pages(
     record_id: Optional[str] = Query(None, description="Filter by record ID"),
     name: Optional[str] = Query(None, description="Search by name"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=config.PAGES_LIST_DEFAULT_LIMIT),
 ):
     """
     List all pages with optional filters
@@ -1040,6 +1057,7 @@ async def list_pages(
     # Default sort: order_by ascending, fallback to name if null
     pages = query.order_by(Page.order_by.asc().nullslast(), Page.name.asc()).distinct().offset(skip).limit(limit).all()
     
+    from app.utils.public_links import build_record_public_url_pdf
     return {
         "items": [
             {
@@ -1065,6 +1083,7 @@ async def list_pages(
                 "created_on": page.created_on.isoformat() if page.created_on else None,
                 "created_by": str(page.created_by) if page.created_by else None,
                 "order_by": page.order_by,
+                "pdf_public_url": build_record_public_url_pdf(page.record_id) if page.record_id else None,
             }
             for page in pages
         ],

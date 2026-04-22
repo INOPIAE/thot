@@ -28,67 +28,103 @@ def _build_overlay_page(
     downloaded_at: datetime,
     record_name: Optional[str],
     record_signature: Optional[str],
+    record_pdf_url: Optional[str],
     page_text: Optional[str],
     watermark_image_path: Optional[Path],
+    watermark_copyright: Optional[str],
+    restriction_message: Optional[str],
 ) -> bytes:
     """Create one transparent overlay page matching the PDF page size."""
     buffer = BytesIO()
     overlay = canvas.Canvas(buffer, pagesize=(width, height))
 
-    # Diagonal background label.
-    overlay.saveState()
-    overlay.translate(width / 2, height / 2)
-    overlay.rotate(38)
-    overlay.setFillColor(Color(0.85, 0.05, 0.05, alpha=0.14))
-    overlay.setFont("Helvetica-Bold", min(width, height) * 0.12)
-    overlay.drawCentredString(0, 0, "CONFIDENTIAL")
-    overlay.restoreState()
+    if restriction_message:
+        # Diagonal background label.
+        overlay.saveState()
+        overlay.translate(width / 2, height / 2)
+        overlay.rotate(38)
+        overlay.setFillColor(Color(0.85, 0.05, 0.05, alpha=0.14))
+        overlay.setFont("Helvetica-Bold", min(width, height) * 0.12)
+        overlay.drawCentredString(0, 0, restriction_message)
+        overlay.restoreState()
 
-    # Header badge area with optional image.
-    left_x = 36
-    right_x = width - 36
-    top_y = height - 36
-
-    text_start_x = left_x
+    from config import config
     if watermark_image_path and watermark_image_path.exists() and watermark_image_path.is_file():
         try:
             image_reader = ImageReader(str(watermark_image_path))
             img_width, img_height = image_reader.getSize()
-            target_height = 58
-            scale = target_height / max(img_height, 1)
-            target_width = max(32, img_width * scale)
+
+            max_width = width * 0.9
+            max_height = height * 0.9
+
+            scale = min(max_width / img_width, max_height / img_height)
+
+            target_width = img_width * scale
+            target_height = img_height * scale
+
+            x = (width - target_width) / 2
+            y = (height - target_height) / 2
+
+            overlay.saveState()
+
+            alpha = getattr(config, "PDF_WATERMARK_IMAGE_ALPHA", 0.15)
+            overlay.setFillAlpha(alpha)
+            overlay.setStrokeAlpha(alpha)
+
             overlay.drawImage(
                 image_reader,
-                left_x,
-                top_y - target_height,
+                x,
+                y,
                 width=target_width,
                 height=target_height,
                 preserveAspectRatio=True,
                 mask="auto",
             )
-            text_start_x = left_x + target_width + 14
+
+            overlay.restoreState()
+
         except Exception:
-            # Do not fail watermark generation when logo loading is broken.
-            text_start_x = left_x
+            pass
 
-    overlay.setFillColor(Color(0.1, 0.1, 0.1, alpha=0.9))
-    overlay.setFont("Helvetica-Bold", 14)
-    overlay.drawString(text_start_x, top_y, "CONFIDENTIAL")
+    right_x = width - 36
+    top_y = height - 15
 
-    overlay.setFont("Helvetica", 10)
-    overlay.drawString(text_start_x, top_y - 16, f"Downloaded by: {_fit_text(username, 48)}")
-    overlay.drawString(text_start_x, top_y - 30, downloaded_at.strftime("%Y-%m-%d %H:%M"))
-
-    # Record and page context block (requested metadata).
-    info_lines = [
-        f"Record name: {_fit_text(record_name)}",
-        f"Record signature: {_fit_text(record_signature, 64)}",
-        f"Page: {_fit_text(page_text)}",
+    text_parts = [
+        f"(c) {watermark_copyright}",
+        _fit_text(record_name, 150),
+        _fit_text(record_signature, 20),
     ]
+
+    if page_text:
+        text_parts.append(_fit_text(page_text, 20))
+
+    final_text = ", ".join(text_parts)
+
+    from config import config
+    info_lines = [final_text]
+    if getattr(config, "PDF_WATERMARK_SHOW_CITATION_LINK", True):
+        info_lines.append(f"Zitat-Link: {_fit_text(record_pdf_url, 100)}")
+    info_lines.append(f"Download {downloaded_at.strftime('%Y-%m-%d %H:%M')} by {_fit_text(username, 48)}")
+
     overlay.setFont("Helvetica", 9)
-    line_y = top_y - 52
+    line_y = top_y
     for line in info_lines:
         overlay.drawRightString(right_x, line_y, line)
+        if line.startswith("Zitat-Link:") and record_pdf_url:
+            # Berechne die Textbreite
+            text = _fit_text(record_pdf_url, 100)
+            link_width = overlay.stringWidth(f"Zitat-Link: {text}", "Helvetica", 9)
+            # Setze das Rechteck für den Link (x1, y1, x2, y2)
+            overlay.linkURL(
+                record_pdf_url,
+                (
+                    right_x - link_width,  # x1 (linker Rand)
+                    line_y - 2,            # y1 (etwas unterhalb)
+                    right_x,               # x2 (rechter Rand)
+                    line_y + 10            # y2 (etwas oberhalb)
+                ),
+                relative=0
+            )
         line_y -= 12
 
     overlay.save()
@@ -102,8 +138,11 @@ def create_watermarked_pdf(
     downloaded_at: datetime,
     record_name: Optional[str],
     record_signature: Optional[str],
+    record_pdf_url: Optional[str],
     page_text: Optional[str],
     watermark_image_path: Optional[Path] = None,
+    watermark_copyright: Optional[str] = None,
+    restriction_message: Optional[str] = None,
 ) -> bytes:
     """Generate a watermarked PDF and return its binary content."""
     reader = PdfReader(str(source_pdf))
@@ -120,8 +159,11 @@ def create_watermarked_pdf(
             downloaded_at=downloaded_at,
             record_name=record_name,
             record_signature=record_signature,
+            record_pdf_url=record_pdf_url,
             page_text=page_text,
             watermark_image_path=watermark_image_path,
+            watermark_copyright=watermark_copyright,
+            restriction_message=restriction_message,
         )
         overlay_reader = PdfReader(BytesIO(overlay_pdf_bytes))
         original_page.merge_page(overlay_reader.pages[0])
@@ -141,6 +183,7 @@ def create_thumbnail_with_watermark(
     record_signature: Optional[str],
     page_text: Optional[str],
     watermark_image_path: Optional[Path] = None,
+    watermark_copyright: Optional[str] = None,
     thumbnail_width: int = 200,
 ) -> bytes:
     """Generate a thumbnail of the first page with watermark overlay using PyMuPDF."""
@@ -231,7 +274,7 @@ def create_thumbnail_with_watermark(
         
         # Draw metadata text
         y_pos = top_y
-        draw.text((text_start_x, y_pos), "CONFIDENTIAL", fill=(26, 26, 26, 230), font=font_regular)
+        draw.text((text_start_x, y_pos), watermark_copyright, fill=(26, 26, 26, 230), font=font_small)
         
         y_pos += int(10 * scale_y)
         username_short = _fit_text(username, 20)

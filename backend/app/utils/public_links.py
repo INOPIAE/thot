@@ -114,3 +114,9 @@ def generate_qr_code_base64(
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def build_record_public_url_pdf(record_id: UUID) -> str:
+    """Build the public frontend URL for a record's PDF."""
+    encoded_id = encode_uuid_to_base62(record_id)
+    return f"{config.FRONTEND_URL.rstrip('/')}/pdf/{encoded_id}"

@@ -3,7 +3,7 @@
     <div class="records-header">
       <h1>{{ $t('records.title') }}</h1>
       <div class="header-actions">
-        <router-link v-if="canCreateRecord" to="/records/new" class="btn btn-primary">
+        <router-link v-if="!defaultListMode && canCreateRecord" to="/records/new" class="btn btn-primary">
           {{ $t('records.createNew') }}
         </router-link>
       </div>
@@ -18,7 +18,6 @@
             id="search-title"
             v-model="searchTitle"
             type="text"
-            class="form-control"
             :placeholder="$t('records.titlePlaceholder')"
             @input="handleSearch"
           />
@@ -109,11 +108,11 @@
             <th>{{ $t('records.keywordsNames') }}</th>
             <th>{{ $t('records.keywordsLocations') }}</th>
             <th>{{ $t('records.loantype') }}</th>
-            <th v-if="authStore.hasRole('admin') || authStore.hasRole('user_bibl')">{{ $t('records.loantypeSubtype') }}</th>
-            <th>{{ $t('records.restriction') }}</th>
-            <th>{{ $t('records.workstatus') }}</th>
+            <th v-if="!defaultListMode && (authStore.hasRole('admin') || authStore.hasRole('user_bibl'))">{{ $t('records.loantypeSubtype') }}</th>
+            <th v-if="!defaultListMode">{{ $t('records.restriction') }}</th>
+            <th v-if="!defaultListMode">{{ $t('records.workstatus') }}</th>
             <th>{{ $t('pages.totalCount') }}</th>
-            <th>{{ $t('records.createdOn') }}</th>
+            <th v-if="!defaultListMode">{{ $t('records.createdOn') }}</th>
             <th>{{ $t('common.actions') }}</th>
           </tr>
         </thead>
@@ -136,25 +135,37 @@
               <span v-else>-</span>
             </td>
             <td>
-              <span v-if="authStore.hasRole('admin') || authStore.hasRole('user_bibl')">
+              <span v-if="!defaultListMode && (authStore.hasRole('admin') || authStore.hasRole('user_bibl'))">
                 {{ record.loantype ? (record.loantype + (record.loantype_subtype ? ' - ' + record.loantype_subtype : '')) : '-' }}
               </span>
               <span v-else>
                 {{ record.loantype || '-' }}
               </span>
             </td>
-            <td>{{ record.restriction || '-' }}</td>
-            <td>{{ record.workstatus || '-' }}</td>
+            <td v-if="!defaultListMode">{{ record.restriction || '-' }}</td>
+            <td v-if="!defaultListMode">{{ record.workstatus || '-' }}</td>
             <td class="pages-count">{{ record.page_count || 0 }}</td>
-            <td>{{ formatDate(record.created_on) }}</td>
+            <td v-if="!defaultListMode">{{ formatDate(record.created_on) }}</td>
             <td class="actions-cell">
-              <router-link :to="getPagesUrl(record.id)" class="btn btn-sm btn-secondary">
+              <router-link
+                v-if="record.page_count > 0"
+                :to="`/records/${record.id}/pages-gallery`"
+                class="btn btn-sm btn-secondary"
+              >
                 {{ $t('pages.title') }}
               </router-link>
-              <router-link :to="`/records/${record.id}`" class="btn btn-sm btn-info">
+              <router-link
+                v-if="!defaultListMode"
+                :to="`/records/${record.id}`"
+                class="btn btn-sm btn-info"
+              >
                 {{ canEditRecord ? $t('common.edit') : $t('common.view') }}
               </router-link>
-              <button v-if="canEditRecord" class="btn btn-sm btn-danger" @click="deleteRecord(record.id)">
+              <button
+                v-if="!defaultListMode && canEditRecord"
+                class="btn btn-sm btn-danger"
+                @click="deleteRecord(record.id)"
+              >
                 {{ $t('common.delete') }}
               </button>
             </td>
@@ -195,11 +206,17 @@
 
 <script>
 import { defineComponent } from 'vue'
-import { recordService } from '@/services/record'
+import { fetchRecords } from '@/services/records'
 import { useAuthStore } from '@/stores/auth'
 
 export default defineComponent({
   name: 'RecordList',
+  props: {
+    defaultListMode: {
+      type: Boolean,
+      default: false,
+    },
+  },
   setup() {
     const authStore = useAuthStore()
     return { authStore }
@@ -253,31 +270,25 @@ export default defineComponent({
       this.successMessage = null
 
       try {
-        const params = {
+        let params = {
           skip: this.currentPage * this.pageSize,
           limit: this.pageSize,
         }
-
-        if (this.searchTitle) {
-          params.title = this.searchTitle
+        if (this.searchTitle) params.title = this.searchTitle
+        if (this.searchSignature) params.signature = this.searchSignature
+        if (this.searchKeywordsNames) params.keywords_names = this.searchKeywordsNames
+        if (this.searchKeywordsLocations) params.keywords_locations = this.searchKeywordsLocations
+        if (this.defaultListMode) {
+          params.endpoint = '/api/v1/records/defaultlist'
         }
-
-        if (this.searchSignature) {
-          params.signature = this.searchSignature
+        const data = await fetchRecords(params)
+        if (Array.isArray(data)) {
+          this.records = data
+          this.totalRecords = data.length
+        } else {
+          this.records = data.items || []
+          this.totalRecords = data.total || 0
         }
-
-        if (this.searchKeywordsNames) {
-          params.keywords_names = this.searchKeywordsNames
-        }
-
-        if (this.searchKeywordsLocations) {
-          params.keywords_locations = this.searchKeywordsLocations
-        }
-
-        const response = await recordService.listRecords(params)
-
-        this.records = response.items || []
-        this.totalRecords = response.total || 0
       } catch (err) {
         this.error = err.message || this.$t('records.loadError')
         console.error('Error loading records:', err)

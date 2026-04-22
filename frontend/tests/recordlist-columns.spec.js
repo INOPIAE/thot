@@ -22,51 +22,55 @@ function createI18nInstance(locale = 'en') {
 }
 
 describe('RecordList.vue role-based columns', () => {
+  let pinia
   beforeEach(() => {
-    setActivePinia(createPinia())
+    pinia = createPinia()
+    setActivePinia(pinia)
     localStorage.clear()
     vi.clearAllMocks()
   })
 
-  function mountWithRole(role) {
+  function mountWithRole(role, defaultListMode = false) {
     const authStore = useAuthStore()
     authStore.user = { roles: [role] }
     authStore.token = 'token'
-    return mount(RecordList, {
+    const wrapper = mount(RecordList, {
       global: {
-        plugins: [createI18nInstance()],
+        plugins: [pinia, createI18nInstance()],
         mocks: {
           $t: (msg, vars) => (vars ? `${msg} ${JSON.stringify(vars)}` : msg),
         },
       },
-      data() {
-        return {
-          records: [
-            { id: 1, title: 'Test', loantype: 'Book', loantype_subtype: 'Short', restriction: 'None' },
-          ],
-          loading: false,
-        }
+      props: {
+        defaultListMode,
       },
     })
+    wrapper.vm.records = [
+      { id: 1, title: 'Test', loantype: 'Book', loantype_subtype: 'Short', restriction: 'None' },
+    ]
+    wrapper.vm.loading = false
+    return wrapper
   }
 
   it('shows only loantype for normal user', async () => {
-    const wrapper = mountWithRole('user')
+    const wrapper = mountWithRole('user', true)
     await flushPromises()
-    console.log(wrapper.html())
+//    console.log('USER:', wrapper.html())
     expect(wrapper.html()).toContain('Book')
     expect(wrapper.html()).not.toContain('Book - Short')
   })
 
   it('shows loantype and subtype combined for admin', async () => {
-    const wrapper = mountWithRole('admin')
+    const wrapper = mountWithRole('admin', false)
     await flushPromises()
+//    console.log('ADMIN:', wrapper.html())
     expect(wrapper.html()).toContain('Book - Short')
   })
 
   it('shows loantype and subtype combined for user_bibl', async () => {
-    const wrapper = mountWithRole('user_bibl')
+    const wrapper = mountWithRole('user_bibl', false)
     await flushPromises()
+//    console.log('USER_BIBL:', wrapper.html())
     expect(wrapper.html()).toContain('Book - Short')
   })
 })

@@ -308,7 +308,7 @@ export default {
       try {
         const { blob, contentDisposition } = await pageService.downloadWatermarkedPdf(this.pageId)
         const fileName = this.extractFilename(contentDisposition)
-          || `${(this.page.name || 'page').replace(/\s+/g, '_')}_watermarked.pdf`
+          || `${(this.page.name || 'page').replace(/\s+/g, '_')}.pdf`
 
         const url = window.URL.createObjectURL(blob)
         const link = document.createElement('a')

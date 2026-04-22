@@ -752,6 +752,31 @@ class RecordReducedResponse(BaseModel):
     signature: Optional[str] = None
 
 
+class RecordListDefaultItemResponse(BaseModel):
+    """Record list item used in paginated list endpoint"""
+
+    id: UUID
+    title: str
+    description: Optional[str] = None
+    signature: Optional[str] = None
+    comment: Optional[str] = None
+    loantype: Optional[str] = None  # Name des Loantype (loan)
+    keywords_names: str = ""
+    keywords_locations: str = ""
+    authors: str = ""
+    publisher: str = ""
+    page_count: int = 0
+
+
+class RecordListDefaultResponse(BaseModel):
+    """Paginated record list response"""
+
+    items: List[RecordListDefaultItemResponse]
+    total: int
+    skip: int
+    limit: int
+
+
 # ========================
 # Generic Schemas
 # ========================

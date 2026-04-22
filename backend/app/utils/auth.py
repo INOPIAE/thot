@@ -177,3 +177,32 @@ def is_password_reset_needed(password: str) -> bool:
     """Check if password matches common weak patterns"""
     weak_passwords = ["password", "12345678", "qwerty", "123456", "passw0rd"]
     return password.lower() in weak_passwords
+
+from fastapi import Request
+from fastapi.security import HTTPAuthorizationCredentials
+
+async def optional_user(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns user if logged in.
+    If PUBLIC_USE is True → user can be None (aber auch User).
+    """
+    token = request.headers.get("authorization")
+    current_user = None
+    if token and token.lower().startswith("bearer "):
+        try:
+            current_user = await get_current_user(
+                HTTPAuthorizationCredentials(scheme="Bearer", credentials=token.split()[1]), db
+            )
+        except Exception:
+            current_user = None
+
+    if config.PUBLIC_USE:
+        return current_user  # darf auch None sein
+
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    return current_user

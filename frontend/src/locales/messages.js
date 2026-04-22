@@ -74,6 +74,7 @@ export const messages = {
       register: 'Register',
       records: 'Objects',
       recordList: 'Object List',
+      objectListDefault: 'Object List Default',
       createRecord: 'Create Object',
       userManagement: 'User Management',
       myProfile: 'My Profile',
@@ -432,6 +433,8 @@ export const messages = {
       qrLoadError: 'Failed to load QR code',
       resolvingPublicLink: 'Resolving public record link...',
       publicLinkInvalid: 'Public link is invalid or no longer available.',
+      citationLink: 'Citation Link',
+      citationLinkCopy: 'Copy citation link',
     },
 
     // Pages
@@ -512,6 +515,7 @@ export const messages = {
       orderBy: 'Sort Order',
       orderByPlaceholder: 'Sort order of the page within the record (optional)',
       orderByHelp: 'Pages with lower sort order values are displayed first. If not set, pages are sorted by page name.',
+      pdfFileStatus: 'PDF file exists',
     },
 
     // Home
@@ -648,6 +652,7 @@ export const messages = {
       register: 'Registrieren',
       records: 'Objekte',
       recordList: 'Objektliste',
+      objectListDefault: 'Objektliste Default',
       createRecord: 'Objekt erstellen',
       userManagement: 'Benutzerverwaltung',
       myProfile: 'Mein Profil',
@@ -999,6 +1004,8 @@ export const messages = {
       qrLoadError: 'QR-Code konnte nicht geladen werden',
       resolvingPublicLink: 'Öffentlicher Datensatzlink wird aufgelöst...',
       publicLinkInvalid: 'Der öffentliche Link ist ungültig oder nicht mehr verfügbar.',
+      citationLink: 'Zitat-Link',
+      citationLinkCopy: 'Link kopieren',
     },
 
     // Pages
@@ -1079,6 +1086,7 @@ export const messages = {
       orderBy: 'Sortierung',
       orderByPlaceholder: 'Sortierreihenfolge der Seite innerhalb des Datensatzes (optional)',
       orderByHelp: 'Seiten mit niedrigeren Sortierreihenfolgewerten werden zuerst angezeigt. Wenn nicht festgelegt, werden die Seiten nach dem Seitennamen sortiert.',
+      pdfFileStatus: 'PDF-Datei vorhanden',
     },
 
     // Home

@@ -19,6 +19,10 @@ load_dotenv(dotenv_path=env_path)
 
 class Config:
     """Base configuration"""
+    # Show citation link in PDF watermark
+    PDF_WATERMARK_SHOW_CITATION_LINK = os.getenv("PDF_WATERMARK_SHOW_CITATION_LINK", "true").lower() in ("1", "true", "yes")
+    # PDF watermark overlay alpha (opacity)
+    PDF_WATERMARK_IMAGE_ALPHA = float(os.getenv("PDF_WATERMARK_IMAGE_ALPHA", 0.15))
     # Cookie security (set True in production with HTTPS)
     COOKIE_SECURE = os.getenv("COOKIE_SECURE", "0") in ("1", "true", "True")
 
@@ -108,11 +112,15 @@ class Config:
     ITEMS_PER_PAGE_DEFAULT = int(os.getenv("ITEMS_PER_PAGE_DEFAULT", 10))
     ITEMS_PER_PAGE_OPTIONS = [10, 20, 50]
 
+    # Pages API default limit (for /pages endpoint)
+    PAGES_LIST_DEFAULT_LIMIT = int(os.getenv("PAGES_LIST_DEFAULT_LIMIT", 100))
+
     # Feature Flags (can be enabled/disabled via environment variables)
     FEATURE_OTP_ENABLED = os.getenv("FEATURE_OTP_ENABLED", "true").lower() == "true"
     FEATURE_EMAIL_VERIFICATION_ENABLED = os.getenv("FEATURE_EMAIL_VERIFICATION_ENABLED", "true").lower() == "true"
     FEATURE_CORPORATE_APPROVALS_ENABLED = os.getenv("FEATURE_CORPORATE_APPROVALS_ENABLED", "true").lower() == "true"
     CLOSED_REGISTRATION = os.getenv("CLOSED_REGISTRATION", "false").lower() == "true"
+    PUBLIC_USE = os.getenv("PUBLIC_USE", "false").lower() == "true"
 
     # File Upload Configuration
     _DEFAULT_UPLOAD_DIRECTORY = Path(__file__).parent / "uploads"
@@ -120,6 +128,7 @@ class Config:
     MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", 50 * 1024 * 1024))  # 50MB default
     ALLOWED_FILE_EXTENSIONS = [".pdf"]
     WATERMARK_IMAGE_PATH = os.getenv("WATERMARK_IMAGE_PATH", "")
+    WATERMARK_COPYRIGHT = os.getenv("WATERMARK_COPYRIGHT", "")
 
     # QR Code logo (optional, embedded centred at 72�72 px)
     QR_CODE_LOGO_PATH = os.getenv("QR_CODE_LOGO_PATH", "")

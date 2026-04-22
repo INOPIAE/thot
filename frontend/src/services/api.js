@@ -18,8 +18,13 @@ const api = axios.create({
 // Add token and CSRF token to all requests
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
-  if (token) {
+  if (token && token !== 'null' && token !== 'undefined') {
     config.headers.Authorization = `Bearer ${token}`
+  } else {
+    // Falls kein Token, Authorization-Header entfernen (falls gesetzt)
+    if (config.headers && config.headers.Authorization) {
+      delete config.headers.Authorization
+    }
   }
   // Always add CSRF token for all requests (GET included)
   const csrf = getCsrfToken()

@@ -14,7 +14,23 @@
         >
           {{ loadingCombinedPdf ? $t('common.loading') + '...' : $t('pages.downloadCombinedPdf') }}
         </button>
-        <h1>{{ $t('pages.galleryTitle') }}: {{ recordTitle }}</h1>
+        <div>
+          <h1>{{ $t('pages.galleryTitle') }}: {{ recordTitle }}</h1>
+          <div v-if="selectedPage && selectedPage.pdf_public_url" class="citation-link citation-link-row">
+            <span style="margin-right: 0.5rem;">{{ $t('records.citationLink') }}</span>
+            <a
+              :href="selectedPage.pdf_public_url"
+              target="_blank"
+              rel="noopener"
+              class="citation-link-url"
+            >
+              {{ selectedPage.pdf_public_url }}
+            </a>
+            <button class="btn btn-secondary btn-sm" @click="copyCitationLink" style="margin-left: 0.5rem;">
+              {{ $t('records.citationLinkCopy') }}
+            </button>
+          </div>
+        </div>
       </div>
       <div class="header-actions">
         <button
@@ -176,6 +192,17 @@ export default {
     }
   },
   methods: {
+    copyCitationLink() {
+      if (this.selectedPage && this.selectedPage.pdf_public_url) {
+        navigator.clipboard.writeText(this.selectedPage.pdf_public_url)
+          .then(() => {
+            this.$toast?.success?.(this.$t('common.copied')) || alert(this.$t('common.copied'))
+          })
+          .catch(() => {
+            this.$toast?.error?.(this.$t('common.copyError')) || alert(this.$t('common.copyError'))
+          })
+      }
+    },
     async loadRecord() {
       try {
         const record = await recordService.getRecord(this.recordId)
@@ -190,9 +217,14 @@ export default {
       this.loading = true
       this.error = null
       try {
+        // Use backend-configured default limit if available
+        let limit = 100;
+        if (this.$pinia?.state?.app?.appConfig?.itemsPerPageDefault) {
+          limit = this.$pinia.state.app.appConfig.itemsPerPageDefault;
+        }
         const response = await pageService.listPages({
           record_id: this.recordId,
-          limit: 100, // Load all pages for gallery
+          limit,
         })
         // Handle both direct array and paginated response
         let pages = Array.isArray(response) ? response : (response.items || [])
@@ -288,7 +320,7 @@ export default {
         const { blob, contentDisposition } = await pageService.downloadWatermarkedPdf(this.selectedPageId)
         
         // Extract filename from content-disposition or use page name
-        let filename = `${(this.selectedPage.name || 'page').replace(/\s+/g, '_')}_watermarked.pdf`
+        let filename = `${(this.selectedPage.name || 'page').replace(/\s+/g, '_')}.pdf`
         if (contentDisposition) {
           const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition)
           if (matches && matches[1]) {
@@ -321,7 +353,7 @@ export default {
         const { blob, contentDisposition } = await recordService.downloadCombinedPdf(this.recordId)
         
         // Extract filename from content-disposition or use record title
-        let filename = `${(this.recordTitle || 'record').replace(/\s+/g, '_')}_combined.pdf`
+        let filename = `${(this.recordTitle || 'record').replace(/\s+/g, '_')}.pdf`
         if (contentDisposition) {
           const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(contentDisposition)
           if (matches && matches[1]) {
@@ -366,6 +398,23 @@ export default {
 
 <style scoped>
 .pages-gallery-container {
+  .citation-link {
+    margin-top: 0.5rem;
+  }
+
+  .citation-link-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .citation-link-url {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+  }
   padding: 1rem;
   max-width: 100%;
   margin: 0 auto;
