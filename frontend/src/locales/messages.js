@@ -515,6 +515,7 @@ export const messages = {
       orderBy: 'Sort Order',
       orderByPlaceholder: 'Sort order of the page within the record (optional)',
       orderByHelp: 'Pages with lower sort order values are displayed first. If not set, pages are sorted by page name.',
+      pdfFile: 'PDF file exists',
     },
 
     // Home
@@ -1085,6 +1086,7 @@ export const messages = {
       orderBy: 'Sortierung',
       orderByPlaceholder: 'Sortierreihenfolge der Seite innerhalb des Datensatzes (optional)',
       orderByHelp: 'Seiten mit niedrigeren Sortierreihenfolgewerten werden zuerst angezeigt. Wenn nicht festgelegt, werden die Seiten nach dem Seitennamen sortiert.',
+      pdfFile: 'PDF-Datei vorhanden',
     },
 
     // Home
