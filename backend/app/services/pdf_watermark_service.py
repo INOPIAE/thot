@@ -48,6 +48,7 @@ def _build_overlay_page(
         overlay.drawCentredString(0, 0, restriction_message)
         overlay.restoreState()
 
+    from config import config
     if watermark_image_path and watermark_image_path.exists() and watermark_image_path.is_file():
         try:
             image_reader = ImageReader(str(watermark_image_path))
@@ -66,8 +67,9 @@ def _build_overlay_page(
 
             overlay.saveState()
 
-            overlay.setFillAlpha(0.15)
-            overlay.setStrokeAlpha(0.15)
+            alpha = getattr(config, "PDF_WATERMARK_IMAGE_ALPHA", 0.15)
+            overlay.setFillAlpha(alpha)
+            overlay.setStrokeAlpha(alpha)
 
             overlay.drawImage(
                 image_reader,
@@ -98,11 +100,11 @@ def _build_overlay_page(
 
     final_text = ", ".join(text_parts)
 
-    info_lines = [
-        final_text,
-        f"Zitat-Link: {_fit_text(record_pdf_url, 100)}",
-        f"Download {downloaded_at.strftime('%Y-%m-%d %H:%M')} by {_fit_text(username, 48)}",
-    ]
+    from config import config
+    info_lines = [final_text]
+    if getattr(config, "PDF_WATERMARK_SHOW_CITATION_LINK", True):
+        info_lines.append(f"Zitat-Link: {_fit_text(record_pdf_url, 100)}")
+    info_lines.append(f"Download {downloaded_at.strftime('%Y-%m-%d %H:%M')} by {_fit_text(username, 48)}")
 
     overlay.setFont("Helvetica", 9)
     line_y = top_y

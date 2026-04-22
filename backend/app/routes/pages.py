@@ -1026,7 +1026,7 @@ async def list_pages(
     record_id: Optional[str] = Query(None, description="Filter by record ID"),
     name: Optional[str] = Query(None, description="Search by name"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(10, ge=1, le=config.PAGES_LIST_DEFAULT_LIMIT),
 ):
     """
     List all pages with optional filters

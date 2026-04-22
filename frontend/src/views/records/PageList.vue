@@ -91,7 +91,7 @@
               <strong>{{ $t('pages.comment') }}:</strong> {{ page.comment }}
             </p>
             <p class="page-file">
-              <strong>{{ $t('pages.pdfFile') }}:</strong>
+              <strong>{{ $t('pages.pdfFileStatus') }}:</strong>
               {{ page.location_file ? $t('common.yes') : $t('common.no') }}
             </p>
             <p v-if="page.page_count" class="page-count">

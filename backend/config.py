@@ -19,6 +19,10 @@ load_dotenv(dotenv_path=env_path)
 
 class Config:
     """Base configuration"""
+    # Show citation link in PDF watermark
+    PDF_WATERMARK_SHOW_CITATION_LINK = os.getenv("PDF_WATERMARK_SHOW_CITATION_LINK", "true").lower() in ("1", "true", "yes")
+    # PDF watermark overlay alpha (opacity)
+    PDF_WATERMARK_IMAGE_ALPHA = float(os.getenv("PDF_WATERMARK_IMAGE_ALPHA", 0.15))
     # Cookie security (set True in production with HTTPS)
     COOKIE_SECURE = os.getenv("COOKIE_SECURE", "0") in ("1", "true", "True")
 
@@ -107,6 +111,9 @@ class Config:
     # UI
     ITEMS_PER_PAGE_DEFAULT = int(os.getenv("ITEMS_PER_PAGE_DEFAULT", 10))
     ITEMS_PER_PAGE_OPTIONS = [10, 20, 50]
+
+    # Pages API default limit (for /pages endpoint)
+    PAGES_LIST_DEFAULT_LIMIT = int(os.getenv("PAGES_LIST_DEFAULT_LIMIT", 100))
 
     # Feature Flags (can be enabled/disabled via environment variables)
     FEATURE_OTP_ENABLED = os.getenv("FEATURE_OTP_ENABLED", "true").lower() == "true"

@@ -466,7 +466,7 @@ async def download_combined_pdf(
             Page.active == True,
             Page.location_file.isnot(None)
         )
-        .order_by(Page.name)
+        .order_by(Page.order_by.asc().nulls_last(), Page.name.asc())
         .all()
     )
     

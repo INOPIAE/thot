@@ -217,9 +217,14 @@ export default {
       this.loading = true
       this.error = null
       try {
+        // Use backend-configured default limit if available
+        let limit = 100;
+        if (this.$pinia?.state?.app?.appConfig?.itemsPerPageDefault) {
+          limit = this.$pinia.state.app.appConfig.itemsPerPageDefault;
+        }
         const response = await pageService.listPages({
           record_id: this.recordId,
-          limit: 100, // Load all pages for gallery
+          limit,
         })
         // Handle both direct array and paginated response
         let pages = Array.isArray(response) ? response : (response.items || [])
