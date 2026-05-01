@@ -66,7 +66,7 @@ app.add_middleware(CSRFMiddleware, secret_key=config.SECRET_KEY)
 # Add Trusted Host middleware
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", "*.example.com"],
+    allowed_hosts=["localhost", "127.0.0.1", config.FRONTEND_HOST],
 )
 
 

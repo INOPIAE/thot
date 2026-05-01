@@ -28,7 +28,8 @@ CSRF_EXEMPT_PATHS = [
     "/docs",
     "/redoc",
     "/health",
-    "/status"
+    "/status",
+    "/config"
 ]
 
 class CSRFMiddleware(BaseHTTPMiddleware):

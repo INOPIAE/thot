@@ -125,10 +125,13 @@ async def register_user(
     }
 
 
+from fastapi import Response
+
 @router.get("/register/confirm/{token}")
 async def get_registration_confirmation(
     token: str,
     db: Session = Depends(get_db),
+    response: Response = None,
 ):
     """
     Get registration details to confirm before completing registration
@@ -141,6 +144,19 @@ async def get_registration_confirmation(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error
+        )
+
+    # Set CSRF cookie for registration confirmation POST
+    from app.middleware.csrf import CSRFMiddleware
+    csrf_token = CSRFMiddleware.generate_csrf_token()
+    if response is not None:
+        response.set_cookie(
+            key="csrf_token",
+            value=csrf_token,
+            httponly=False,  # Must be readable by frontend JS
+            secure=False,    # Set True in production with HTTPS
+            samesite="Lax",
+            max_age=60*60*24,
         )
 
     return {
