@@ -10,12 +10,22 @@ import uuid
 import pyotp
 import jwt
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session, selectinload
 
 from config import config
 from app.database import get_db
+
+from app.services.user_service import UserService
+
+from app.models.role import Role
+from app.models.role_permission import RolePermission
+from app.models.user import User
+from app.models.user_role import UserRole
+
+# from fastapi import Request
+# from fastapi.security import HTTPAuthorizationCredentials
 
 security = HTTPBearer()
 
@@ -118,13 +128,7 @@ async def get_current_user(
     Get current user from JWT token
     FastAPI dependency for routes that require authentication
     """
-    # Import here to avoid circular imports
-    from app.services.user_service import UserService
-    
-    from app.models.role import Role
-    from app.models.role_permission import RolePermission
-    from app.models.user import User
-    from app.models.user_role import UserRole
+
 
     token = credentials.credentials
     user_id = decode_access_token(token)
@@ -178,8 +182,6 @@ def is_password_reset_needed(password: str) -> bool:
     weak_passwords = ["password", "12345678", "qwerty", "123456", "passw0rd"]
     return password.lower() in weak_passwords
 
-from fastapi import Request
-from fastapi.security import HTTPAuthorizationCredentials
 
 async def optional_user(
     request: Request,

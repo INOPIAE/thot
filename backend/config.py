@@ -6,6 +6,7 @@ Supports both development/testing and production environments.
 import os
 import urllib.parse
 import shutil
+import re
 from datetime import timedelta
 from typing import Optional
 from pathlib import Path
@@ -94,7 +95,6 @@ class Config:
     # Frontend
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
     # Extract hostname for allowed hosts (remove protocol and trailing slash)
-    import re
     _frontend_host = re.sub(r"^https?://", "", FRONTEND_URL).split("/")[0]
     FRONTEND_HOST = os.getenv("FRONTEND_HOST", _frontend_host)
     API_TERMS_OF_SERVICE_URL = os.getenv(
