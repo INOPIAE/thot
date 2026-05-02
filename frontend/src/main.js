@@ -38,6 +38,10 @@ const authStore = useAuthStore()
 async function bootstrap() {
   try {
     await appStore.initializeConfig()
+    // Setze den Dokumenttitel dynamisch nach Laden der Config
+    if (appStore.appConfig && appStore.appConfig.appName) {
+      document.title = appStore.appConfig.appName
+    }
   } catch (error) {
     console.error('Config initialization failed:', error)
   }
