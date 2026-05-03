@@ -42,18 +42,25 @@ class PageService:
         Returns:
             True if valid, raises HTTPException otherwise
         """
+        env = getattr(config, "ENVIRONMENT", "production")
         if not file:
+            detail = "No file provided"
+            if env == "development":
+                detail += " (UploadFile object is None or missing in request)"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No file provided"
+                detail=detail
             )
 
         # Check file extension
         file_ext = Path(file.filename).suffix.lower()
         if file_ext not in config.ALLOWED_FILE_EXTENSIONS:
+            detail = f"File type {file_ext} not allowed. Allowed types: {', '.join(config.ALLOWED_FILE_EXTENSIONS)}"
+            if env == "development":
+                detail += f" (filename: {file.filename}, allowed: {config.ALLOWED_FILE_EXTENSIONS})"
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File type {file_ext} not allowed. Allowed types: {', '.join(config.ALLOWED_FILE_EXTENSIONS)}"
+                detail=detail
             )
 
         return True
@@ -66,10 +73,10 @@ class PageService:
         Args:
             file: Uploaded file
             record_id: Record ID for organizing files
-            
         Returns:
             Path to saved file relative to upload directory
         """
+        env = getattr(config, "ENVIRONMENT", "production")
         PageService.validate_file(file)
         
         # Get record directory
@@ -86,9 +93,12 @@ class PageService:
             
             # Check file size
             if len(content) > config.MAX_UPLOAD_SIZE:
+                detail = f"File size exceeds maximum allowed size of {config.MAX_UPLOAD_SIZE / (1024*1024):.0f}MB"
+                if env == "development":
+                    detail += f" (actual: {len(content)} bytes, max: {config.MAX_UPLOAD_SIZE} bytes)"
                 raise HTTPException(
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"File size exceeds maximum allowed size of {config.MAX_UPLOAD_SIZE / (1024*1024):.0f}MB"
+                    detail=detail
                 )
             
             with open(file_path, "wb") as f:
@@ -103,9 +113,13 @@ class PageService:
         except HTTPException:
             raise
         except Exception as e:
+            detail = f"Failed to save file: {str(e)}"
+            if env == "development":
+                import traceback
+                detail += f"\nTraceback: {traceback.format_exc()}"
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to save file: {str(e)}"
+                detail=detail
             )
 
     @staticmethod

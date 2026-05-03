@@ -20,6 +20,8 @@ load_dotenv(dotenv_path=env_path)
 
 class Config:
     """Base configuration"""
+    # Environment
+    ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
     # Show citation link in PDF watermark
     PDF_WATERMARK_SHOW_CITATION_LINK = os.getenv("PDF_WATERMARK_SHOW_CITATION_LINK", "true").lower() in ("1", "true", "yes")
     # PDF watermark overlay alpha (opacity)
@@ -322,16 +324,13 @@ class Config:
 
 class DevelopmentConfig(Config):
     """Development configuration"""
-
     DEBUG = True
     TESTING = False
     DB_NAME = os.getenv("DB_NAME", "nlf_db_dev")
     DATABASE_URL = f"postgresql://{Config.DB_USER}:{Config.DB_PASSWORD}@{Config.DB_HOST}:{Config.DB_PORT}/{DB_NAME}"
 
-
 class TestingConfig(Config):
     """Testing configuration"""
-
     DEBUG = True
     TESTING = True
     DB_NAME = os.getenv("DB_NAME", "nlf_db_test")
