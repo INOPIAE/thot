@@ -580,17 +580,25 @@ def _parse_page_number_priority() -> list[str]:
 
 def _extract_page_number_from_pdf_text(file_relative_path: Optional[str]) -> Optional[int]:
     """Extract page number from OCR output using positional zone detection and configurable source priority."""
-    image_footer = _extract_page_number_from_pdf_image_footer(file_relative_path)
-    if image_footer is not None:
-        return image_footer
-    # Positional detection is the next-best fallback when image-based stamp OCR
-    # cannot resolve a zero-padded footer stamp.
-    positional = _extract_positional_page_number_from_pdf(file_relative_path)
-    if positional is not None:
-        return positional
-    # Full-text fallback (for PDFs without readable position data).
-    text = _extract_text_from_pdf_first_page(file_relative_path)
-    return _extract_page_number_from_text(text)
+    try:
+        image_footer = _extract_page_number_from_pdf_image_footer(file_relative_path)
+        if image_footer is not None:
+            return image_footer
+        # Positional detection is the next-best fallback when image-based stamp OCR
+        # cannot resolve a zero-padded footer stamp.
+        positional = _extract_positional_page_number_from_pdf(file_relative_path)
+        if positional is not None:
+            return positional
+        # Full-text fallback (for PDFs without readable position data).
+        text = _extract_text_from_pdf_first_page(file_relative_path)
+        return _extract_page_number_from_text(text)
+    except Exception as e:
+        import traceback
+        env = getattr(config, "ENVIRONMENT", "production")
+        detail = f"Fehler beim Extrahieren der Seitenzahl aus PDF: {str(e)}"
+        if env == "development":
+            detail += f"\nfile_relative_path: {file_relative_path}\nTraceback: {traceback.format_exc()}"
+        raise HTTPException(status_code=400, detail=detail)
 
 
 def _extract_page_number_from_pdf_image_footer(file_relative_path: Optional[str]) -> Optional[int]:
