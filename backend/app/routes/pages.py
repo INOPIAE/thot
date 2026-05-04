@@ -542,6 +542,7 @@ def _extract_page_number_from_pdf_text(file_relative_path: Optional[str]) -> Opt
         detail = f"Fehler beim Extrahieren der Seitenzahl aus PDF: {str(e)}"
         if env == "development":
             detail += f"\nfile_relative_path: {file_relative_path}\nTraceback: {traceback.format_exc()}"
+        logging.error(detail)
         raise HTTPException(status_code=400, detail=detail)
 
 
@@ -1159,9 +1160,10 @@ async def create_page(
                 max_order = db.query(Page).filter(Page.record_id == record_uuid).order_by(Page.order_by.desc()).with_entities(Page.order_by).first()
                 start_order = (max_order[0] if max_order and max_order[0] is not None else 0) + 1
                 new_pages = []
-                for i in range(num_pages):
-                    logging.info("Create Page 3 - Seite %d", i+1)
-                    try:
+                created_files = []  # Track all created files for rollback
+                try:
+                    for i in range(num_pages):
+                        logging.info("Create Page 3 - Seite %d", i+1)
                         writer = PdfWriter()
                         writer.add_page(reader.pages[i])
                         buffer = BytesIO()
@@ -1170,6 +1172,7 @@ async def create_page(
                         # Always use 'Seite_{i+1}.pdf' for split pages
                         filename = f"Seite_{i+1}.pdf"
                         rel_path = _save_pdf_content(single_pdf_bytes, record_signature, str(record_uuid), filename, storage_subdir="origin")
+                        created_files.append(config.UPLOAD_DIRECTORY / rel_path)
                         # Always copy file to current folder as Seite_{i+1}_current.pdf
                         signature_folder = _build_signature_folder_name(record_signature, str(record_uuid))
                         current_filename = f"Seite_{i+1}_current.pdf"
@@ -1179,6 +1182,7 @@ async def create_page(
                         current_abs.parent.mkdir(parents=True, exist_ok=True)
                         with open(current_abs, "wb") as f_out:
                             f_out.write(single_pdf_bytes)
+                        created_files.append(current_abs)
                         # Kommentar für jede Seite bestimmen
                         text = reader.pages[i].extract_text() or ""
                         page_number = None
@@ -1216,22 +1220,43 @@ async def create_page(
                                 detail += (f"\nFelder: name=Seite {i+1}, record_id={record_uuid}, restriction_id={restriction_uuid}, user_id={user_uuid}, "
                                            f"description={description}, page={page}, comment={page_comment}, location_file={rel_path}, workstatus_id={workstatus_uuid}, order_by={this_order}")
                                 detail += f"\nTraceback: {traceback.format_exc()}"
+                            # Rollback: delete all created files so far
+                            for f in created_files:
+                                try:
+                                    if f.exists():
+                                        f.unlink()
+                                except Exception:
+                                    pass
                             raise HTTPException(status_code=400, detail=detail)
                         # Ensure current_file is set to current_rel_path if OCR disabled
                         if getattr(config, "OCR_PIPELINE_ENABLED", True) is False:
                             new_page.current_file = current_rel_path
                             db.flush()
                         new_pages.append(new_page)
-                    except HTTPException:
-                        raise
-                    except Exception as e:
-                        import traceback
-                        env = getattr(config, "ENVIRONMENT", "production")
-                        detail = f"Fehler beim Splitten und Einfügen der Page (Seite {i+1}): {str(e)}"
-                        if env == "development":
-                            detail += f"\nTraceback: {traceback.format_exc()}"
-                        raise HTTPException(status_code=400, detail=detail)
-                logging.info("Create Page 4")
+                except HTTPException:
+                    # Rollback: delete all created files so far
+                    for f in created_files:
+                        try:
+                            if f.exists():
+                                f.unlink()
+                        except Exception:
+                            pass
+                    raise
+                except Exception as e:
+                    import traceback
+                    env = getattr(config, "ENVIRONMENT", "production")
+                    detail = f"Fehler beim Splitten und Einfügen der Page: {str(e)}"
+                    if env == "development":
+                        detail += f"\nTraceback: {traceback.format_exc()}"
+                    # Rollback: delete all created files so far
+                    for f in created_files:
+                        try:
+                            if f.exists():
+                                f.unlink()
+                        except Exception:
+                            pass
+                    raise HTTPException(status_code=400, detail=detail)
+                logging.info("Create Page 5")
                 db.commit()
                 # OCR-Job für jede neue Seite erst nach Commit starten
                 for new_page in new_pages:

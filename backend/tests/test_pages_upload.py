@@ -190,7 +190,7 @@ def test_create_page_splits_multi_page_pdf_into_multiple_pages(client, db, tmp_p
             "file": ("multi-page.pdf", _build_pdf(3), "application/pdf"),
         },
     )
-
+    print(response.json())
     assert response.status_code == 200
     payload = response.json()
     assert payload["split_pdf"] is True
@@ -841,3 +841,46 @@ def test_create_and_get_page_with_order_by(client, db, tmp_path, monkeypatch):
     get_payload = get_response.json()
     assert "order_by" in get_payload
     assert get_payload["order_by"] == 7
+
+def test_create_page_rollback_on_error_during_split(client, db, tmp_path, monkeypatch):
+    """Testet, dass bei Fehler in der for-Schleife alle angelegten Dateien gelöscht werden (Rollback)."""
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    # Patch PageService.create_page, um beim zweiten Aufruf einen Fehler zu werfen
+    import app.services.page_service as page_service_mod
+    call_count = {"count": 0}
+    orig_create_page = page_service_mod.PageService.create_page
+    def fail_on_second(*args, **kwargs):
+        call_count["count"] += 1
+        if call_count["count"] == 2:
+            raise Exception("Simulierter Fehler bei Seite 2")
+        return orig_create_page(*args, **kwargs)
+    monkeypatch.setattr(page_service_mod.PageService, "create_page", fail_on_second)
+
+    user = _create_user_with_role(db, "rollback_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="RollbackTest")
+    headers, cookies = _auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+    response = client.post(
+        "/api/v1/pages",
+        headers=headers,
+        data={
+            "name": "Should trigger rollback",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("multi-page.pdf", _build_pdf(3), "application/pdf"),
+        },
+    )
+    # Es muss ein Fehler auftreten
+    assert response.status_code == 400
+    # Es dürfen keine Dateien im Upload-Verzeichnis liegen
+    files = list(tmp_path.rglob("*"))
+    # Nur das tmp_path selbst darf existieren, keine Dateien
+    assert all(f.is_dir() for f in files), f"Es wurden Dateien nicht gelöscht: {files}"
+    # Die Fehlernachricht muss den simulierten Fehler enthalten
+    assert "Simulierter Fehler bei Seite 2" in response.text
+
