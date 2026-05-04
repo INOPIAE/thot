@@ -1,7 +1,7 @@
 <template>
   <div class="records-container">
     <div class="records-header">
-      <h1>{{ $t('records.title') }}</h1>
+      <h1>{{ $t('nav.records') }}</h1>
       <div class="header-actions">
         <router-link v-if="!defaultListMode && canCreateRecord" to="/records/new" class="btn btn-primary">
           {{ $t('records.createNew') }}
@@ -18,6 +18,7 @@
             id="search-title"
             v-model="searchTitle"
             type="text"
+            class="form-control"
             :placeholder="$t('records.titlePlaceholder')"
             @input="handleSearch"
           />
@@ -362,7 +363,13 @@ export default defineComponent({
 
 <style scoped>
 .records-container {
-  padding: 20px;
+  padding: 5px;
+.records-table thead th {
+  position: sticky;
+  top: 0;
+  background: #f9f9f9;
+  z-index: 2;
+}
 }
 
 .records-header {
@@ -415,11 +422,14 @@ export default defineComponent({
   font-style: italic;
 }
 
+/* Ensure all search fields have the same height */
 .form-control {
   padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 14px;
+  height: 38px;
+  box-sizing: border-box;
 }
 
 .form-control:focus {
@@ -440,11 +450,14 @@ export default defineComponent({
   border: 1px solid #ddd;
   border-radius: 4px;
   overflow-x: auto;
+  max-height: 70vh;
+  overflow-y: auto;
+  max-width: 80vw;
 }
 
 .records-table {
-  width: 100%;
   border-collapse: collapse;
+  min-width: 1000px;
 }
 
 .records-table thead {
