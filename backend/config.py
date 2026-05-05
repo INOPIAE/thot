@@ -175,6 +175,9 @@ class Config:
         "terms-of-service.{lang}.html",
     )
 
+    # Records pers_count link
+    RECORDS_PERS_COUNT_LINK = os.getenv("RECORDS_PERS_COUNT_LINK", "https://example.com/pers_count/{record_id}")
+
     @classmethod
     def get_watermark_image_path(cls) -> Optional[Path]:
         """Return configured watermark image path (or None when disabled)."""

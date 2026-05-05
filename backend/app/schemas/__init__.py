@@ -591,6 +591,8 @@ class RecordBase(BaseModel):
     subtitle: Optional[str] = Field(None, max_length=500, description="Record subtitle")
     description: Optional[str] = Field(None, description="General description")
     comment: Optional[str] = Field(None, description="Internal comment")
+    nlf_fdb: bool = Field(False, description="NLF FDB flag")
+    pers_count: Optional[int] = Field(None, description="Person count")
 
 
 class RecordBibliographicFields(BaseModel):
@@ -664,6 +666,8 @@ class RecordUpdate(BaseModel):
     lettering_id: Optional[UUID] = None
     publicationtype_id: Optional[UUID] = None
     publisher_id: Optional[UUID] = None
+    nlf_fdb: Optional[bool] = None
+    pers_count: Optional[int] = None
 
 
 class RecordUpdateRequest(RecordUpdate):
@@ -685,6 +689,8 @@ class RecordResponse(RecordBase, RecordBibliographicFields):
     lettering_id: Optional[UUID] = None
     publicationtype_id: Optional[UUID] = None
     publisher_id: Optional[UUID] = None
+    nlf_fdb: bool
+    pers_count: Optional[int] = None
     active: bool
     created_on: datetime
     created_by: Optional[UUID] = None
@@ -734,6 +740,8 @@ class RecordListItemResponse(BaseModel):
     created_by: Optional[UUID] = None
     entered_on: Optional[datetime] = None
     page_count: int = 0
+    nlf_fdb: bool = False
+    pers_count: Optional[int] = None
 
 
 class RecordListResponse(BaseModel):
@@ -767,6 +775,8 @@ class RecordListDefaultItemResponse(BaseModel):
     authors: str = ""
     publisher: str = ""
     page_count: int = 0
+    nlf_fdb: bool = False
+    pers_count: Optional[int] = None
 
 
 class RecordListDefaultResponse(BaseModel):

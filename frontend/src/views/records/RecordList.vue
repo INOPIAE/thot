@@ -109,9 +109,10 @@
             <th>{{ $t('records.keywordsNames') }}</th>
             <th>{{ $t('records.keywordsLocations') }}</th>
             <th>{{ $t('records.loantype') }}</th>
-            <!-- <th v-if="!defaultListMode && (authStore.hasRole('admin') || authStore.hasRole('user_bibl'))">{{ $t('records.loantypeSubtype') }}</th> -->
             <th v-if="!defaultListMode">{{ $t('records.restriction') }}</th>
             <th v-if="!defaultListMode">{{ $t('records.workstatus') }}</th>
+            <th>{{ $t('records.nlfFdb') }}</th>
+            <th>{{ $t('records.persCount') }}</th>
             <th>{{ $t('pages.totalCount') }}</th>
             <th v-if="!defaultListMode">{{ $t('records.createdOn') }}</th>
             <th>{{ $t('common.actions') }}</th>
@@ -145,6 +146,21 @@
             </td>
             <td v-if="!defaultListMode">{{ record.restriction || '-' }}</td>
             <td v-if="!defaultListMode">{{ record.workstatus || '-' }}</td>
+            <td class="nlf-fdb-cell">
+              <span v-if="typeof record.nlf_fdb === 'boolean'">
+                {{ record.nlf_fdb ? $t('common.yes') : $t('common.no') }}
+              </span>
+              <span v-else>-</span>
+            </td>
+            <td class="pers-count-cell">
+              <span v-if="record.pers_count > 0">
+                <a :href="persCountLink" target="_blank" rel="noopener noreferrer">
+                  {{ record.pers_count }}
+                </a>
+              </span>
+              <span v-else-if="record.pers_count === 0">0</span>
+              <span v-else>-</span>
+            </td>
             <td class="pages-count">{{ record.page_count || 0 }}</td>
             <td v-if="!defaultListMode">{{ formatDate(record.entered_on) }}</td>
             <td class="actions-cell">
@@ -206,9 +222,10 @@
 </template>
 
 <script>
-import { defineComponent } from 'vue'
+import { defineComponent, computed } from 'vue'
 import { fetchRecords } from '@/services/records'
 import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 
 export default defineComponent({
   name: 'RecordList',
@@ -220,7 +237,10 @@ export default defineComponent({
   },
   setup() {
     const authStore = useAuthStore()
-    return { authStore }
+    const appStore = useAppStore()
+    // Use a computed property to always get the latest config value
+    const persCountLink = computed(() => appStore.getConfig('recordsPersCountLink', '#'))
+    return { authStore, persCountLink }
   },
   data() {
     return {

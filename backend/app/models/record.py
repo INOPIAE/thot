@@ -3,6 +3,7 @@ Record model
 """
 
 import uuid
+import sqlalchemy as sa
 from sqlalchemy import Column, UUID, String, ForeignKey, Text, Date
 from sqlalchemy.orm import relationship
 
@@ -42,6 +43,8 @@ class Record(BaseModel):
     lettering_id = Column(UUID(as_uuid=True), ForeignKey("letterings.id"), nullable=True)
     publicationtype_id = Column(UUID(as_uuid=True), ForeignKey("publicationtypes.id"), nullable=True)
     publisher_id = Column(UUID(as_uuid=True), ForeignKey("publishers.id"), nullable=True)
+    nlf_fdb = Column(sa.Boolean, nullable=False, default=False, server_default=sa.false())
+    pers_count = Column(sa.Integer, nullable=True, default=None)
 
     # Relationships
     restriction = relationship("Restriction", back_populates="records")

@@ -54,6 +54,28 @@
 
     <!-- Form -->
     <form v-if="!loading" @submit.prevent="handleSubmit" class="record-form">
+            <div class="form-row two-columns">
+              <div class="form-group">
+                <label for="nlf_fdb">{{ $t('records.nlfFdb') }}</label>
+                <input
+                  id="nlf_fdb"
+                  type="checkbox"
+                  v-model="form.nlf_fdb"
+                  :disabled="isReadOnlyMode"
+                />
+              </div>
+              <div class="form-group">
+                <label for="pers_count">{{ $t('records.persCount') }}</label>
+                <input
+                  id="pers_count"
+                  type="number"
+                  v-model.number="form.pers_count"
+                  :placeholder="$t('records.persCount')"
+                  :readonly="isReadOnlyMode"
+                  min="0"
+                />
+              </div>
+            </div>
       <div class="form-group">
         <label for="title">{{ $t('records.title') }} <span class="required">*</span></label>
         <input
@@ -636,6 +658,8 @@ export default defineComponent({
         lettering_id: '',
         publicationtype_id: '',
         publisher_id: '',
+        nlf_fdb: false,
+        pers_count: null,
       },
       restrictions: [],
       workstatuses: [],
@@ -809,6 +833,8 @@ export default defineComponent({
           lettering_id: record.lettering_id || '',
           publicationtype_id: record.publicationtype_id || '',
           publisher_id: record.publisher_id || '',
+          nlf_fdb: typeof record.nlf_fdb === 'boolean' ? record.nlf_fdb : false,
+          pers_count: record.pers_count !== undefined && record.pers_count !== null ? record.pers_count : null,
         }
         this.currentPublisher = record.publisher || null
         if (
@@ -872,6 +898,8 @@ export default defineComponent({
           lettering_id: this.form.lettering_id || null,
           publicationtype_id: this.form.publicationtype_id || null,
           publisher_id: this.form.publisher_id || null,
+          nlf_fdb: this.form.nlf_fdb,
+          pers_count: this.form.pers_count,
           record_authors: this.record_authors
             .filter(row => row.author_id)
             .map((row, index) => ({

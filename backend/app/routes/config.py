@@ -55,4 +55,6 @@ async def get_app_config(db: Session = Depends(get_db)):
             "dataProtectionUrl": "/api/v1/config/legal/data-protection",
             "termsOfServiceUrl": "/api/v1/config/legal/terms-of-service",
         },
+        # Custom: Link for pers_count
+        "recordsPersCountLink": config.RECORDS_PERS_COUNT_LINK,
     }

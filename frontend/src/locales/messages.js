@@ -435,6 +435,9 @@ export const messages = {
       publicLinkInvalid: 'Public link is invalid or no longer available.',
       citationLink: 'Citation Link',
       citationLinkCopy: 'Copy citation link',
+      nlfFdb: 'NLF-FDB',
+      persCount: 'Persons cited',
+      persCountLink: 'Show NLF-FDB',
     },
 
     // Pages
@@ -1006,6 +1009,9 @@ export const messages = {
       publicLinkInvalid: 'Der öffentliche Link ist ungültig oder nicht mehr verfügbar.',
       citationLink: 'Zitat-Link',
       citationLinkCopy: 'Link kopieren',
+      nlfFdb: 'NLF-FDB',
+      persCount: 'Personen erwähnt',
+      persCountLink: 'Zeige NLF-FDB',
     },
 
     // Pages
