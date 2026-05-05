@@ -1,8 +1,5 @@
 <template>
   <div class="records-container">
-    <div class="records-header">
-      <h1>Objektliste Default</h1>
-    </div>
     <RecordList :defaultListMode="true" />
   </div>
 </template>
