@@ -1,22 +1,66 @@
 <template>
-  <div class="container">
-    <div v-if="isAuthenticated" class="page-header text-center">
+  <div 
+    class="container"
+  >
+    <div 
+      v-if="isAuthenticated"
+      class="page-header text-center"
+    >
       <h1>{{ $t('common.home') }}</h1>
       <p>Welcome, {{ authStore.currentUser?.username }}!</p>
-      
-      <div v-if="showPendingApprovalNotice && pendingApprovalCount > 0" class="alert alert-info">
+
+      <div 
+        v-if="showPendingApprovalNotice && pendingApprovalCount > 0"
+        class="alert alert-info"
+      >
         <strong>{{ $t('home.pendingApprovalTitle') }}</strong>
         <p>{{ pendingApprovalMessage }}</p>
-        <router-link to="/admin/users" class="btn btn-primary">
+        <router-link 
+          to="/admin/users"
+          class="btn btn-primary"
+        >
           {{ $t('home.viewUsers') }}
         </router-link>
       </div>
+
+      <div 
+        v-if="recentNotifications.length"
+        class="mt-4"
+      >
+        <h2>{{ $t('notifications.recent') }}</h2>
+        <ul>
+          <li 
+            v-for="n in recentNotifications"
+            :key="n.id"
+          >
+            <strong>
+              {{ n.title }}
+              <span v-if="n.role && n.role.name"> ({{ n.role.name }})</span>
+            </strong>
+            <p>
+              {{ n.notification }}
+            </p>
+            <small>{{ $d(new Date(n.created_on), 'short') }}</small>
+          </li>
+        </ul>
+        <router-link 
+          to="/notifications"
+          class="btn btn-link mt-2"
+        >
+          {{ $t('notifications.all') }}
+        </router-link>
+      </div>
     </div>
-    <div v-else class="form-container">
+    <div 
+      v-else
+      class="form-container"
+    >
       <div class="card form-card">
         <div class="text-center">
           <h1>{{ appName }}</h1>
-          <p class="mb-4">Professional Database Management System</p>
+          <p class="mb-4">
+            Professional Database Management System
+          </p>
         </div>
       </div>
     </div>
@@ -44,6 +88,7 @@ export default defineComponent({
   data() {
     return {
       pendingApprovalCount: 0,
+      recentNotifications: [],
     }
   },
   computed: {
@@ -68,6 +113,7 @@ export default defineComponent({
     if (this.showPendingApprovalNotice) {
       await this.loadPendingApprovalCount()
     }
+    await this.loadRecentNotifications()
   },
   methods: {
     async loadPendingApprovalCount() {
@@ -76,6 +122,14 @@ export default defineComponent({
         this.pendingApprovalCount = data.pending_approval_count || 0
       } catch (error) {
         console.error('Failed to load pending approval count:', error)
+      }
+    },
+    async loadRecentNotifications() {
+      try {
+        const res = await (await import('@/services/notification')).notificationService.getRecentNotifications()
+        this.recentNotifications = res.data
+      } catch (e) {
+        this.recentNotifications = []
       }
     },
   },

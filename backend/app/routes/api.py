@@ -3,6 +3,7 @@ API Routes initialization
 """
 
 from fastapi import APIRouter
+
 from app.routes import (
 	auth,
 	users,
@@ -14,6 +15,7 @@ from app.routes import (
 	public_links,
 	library_metadata,
 	record_import,
+	notifications_router,
 )
 
 # Create main router
@@ -29,7 +31,9 @@ api_router.include_router(pages.router)
 api_router.include_router(roles.router)
 api_router.include_router(public_links.router)
 api_router.include_router(library_metadata.router)
+
 api_router.include_router(record_import.router)
+api_router.include_router(notifications_router)
 
 # Export
 __all__ = ["api_router"]

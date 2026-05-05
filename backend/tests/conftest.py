@@ -30,34 +30,21 @@ def auth_headers_and_csrf(user: User):
 @pytest.fixture
 def test_user(db):
     import uuid
-    from app.models import Role, UserRole, Permission, RolePermission
-    db.query(User).filter_by(username="testuser").delete()
+    from app.models import Role, UserRole
+    db.query(User).filter_by(username="testadmin").delete()
     db.commit()
-    # Ensure a role exists
-    role = db.query(Role).filter_by(name="user_bibl").first()
-    if not role:
-        role = Role(id=uuid.uuid4(), name="user_bibl", description="Test Bibliotheksrolle")
-        db.add(role)
+    # Ensure an admin role exists
+    admin_role = db.query(Role).filter_by(name="admin").first()
+    if not admin_role:
+        admin_role = Role(id=uuid.uuid4(), name="admin", description="Admin role")
+        db.add(admin_role)
         db.commit()
-        db.refresh(role)
-    # Ensure a permission exists
-    permission = db.query(Permission).filter_by(name="view_records").first()
-    if not permission:
-        permission = Permission(id=uuid.uuid4(), name="view_records", description="View records")
-        db.add(permission)
-        db.commit()
-        db.refresh(permission)
-    # Ensure role-permission link
-    role_perm = db.query(RolePermission).filter_by(role_id=role.id, permission_id=permission.id).first()
-    if not role_perm:
-        role_perm = RolePermission(role_id=role.id, permission_id=permission.id)
-        db.add(role_perm)
-        db.commit()
-    # Create user
+        db.refresh(admin_role)
+    # Create admin user
     user = User(
-        id=uuid.uuid4() if not isinstance(getattr(User, 'id', None), str) else str(uuid.uuid4()),
-        username="testuser",
-        email="old@example.com",
+        id=uuid.uuid4(),
+        username="testadmin",
+        email="admin@example.com",
         hashed_password="$2b$12$1234567890123456789012abcdefghijklmno12345678901234567890",
         current_language="de",
         active=True,
@@ -69,8 +56,8 @@ def test_user(db):
     db.add(user)
     db.commit()
     db.refresh(user)
-    # Link user to role
-    user_role = UserRole(user_id=user.id, role_id=role.id)
+    # Link user to admin role
+    user_role = UserRole(user_id=user.id, role_id=admin_role.id)
     db.add(user_role)
     db.commit()
     yield user

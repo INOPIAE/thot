@@ -10,6 +10,24 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const routes = [
+  {
+    path: '/notifications/edit/:id',
+    name: 'NotificationEdit',
+    component: () => import('@/views/notifications/NotificationEdit.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/notifications',
+    name: 'NotificationList',
+    component: () => import('@/views/notifications/NotificationList.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/notifications/create',
+    name: 'NotificationCreate',
+    component: () => import('@/views/notifications/NotificationCreate.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
       // Objektliste Default (PUBLIC_USE abhängig)
       {
         path: '/records-default',

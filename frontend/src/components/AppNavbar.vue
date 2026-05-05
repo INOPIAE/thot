@@ -58,6 +58,12 @@
             <router-link to="/auth/register" @click="closeMenu">{{ t('nav.register') }}</router-link>
           </li>
           <li v-if="authStore.hasRole('admin')">
+            <router-link to="/notifications/create" @click="closeMenu">{{ t('nav.createNotification') }}</router-link>
+          </li>
+          <li>
+            <router-link to="/notifications" @click="closeMenu">{{ t('nav.notifications') }}</router-link>
+          </li>
+          <li>
             <router-link to="/admin/roles" @click="closeMenu">{{ t('nav.roles') }}</router-link>
           </li>
           <li v-if="authStore.hasRole('admin')">

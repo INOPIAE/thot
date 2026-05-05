@@ -35,6 +35,8 @@ from .record_author import RecordAuthor
 from .publisher import Publisher
 from .publicationtype import PublicationType
 from .record_condition import RecordCondition
+
+from .notification import Notification
 from .lettering import Lettering
 
 __all__ = [
