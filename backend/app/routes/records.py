@@ -83,7 +83,7 @@ async def list_records_default(
                     for ra in sorted(record.record_authors, key=lambda x: x.order or 0)
                 ]) if record.record_authors else "",
                 publisher=f"{record.publisher.companyname}{' (' + record.publisher.town + ')' if record.publisher and record.publisher.town else ''}" if record.publisher else "",
-                page_count=0,
+                page_count=len(record.pages) if hasattr(record, "pages") else 0,
                 nlf_fdb=record.nlf_fdb,
                 pers_count=record.pers_count,
             )
