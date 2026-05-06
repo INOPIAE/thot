@@ -524,6 +524,7 @@ def _parse_page_number_priority() -> list[str]:
 
 def _extract_page_number_from_pdf_text(file_relative_path: Optional[str]) -> Optional[int]:
     """Extract page number from OCR output using positional zone detection and configurable source priority."""
+    logging.info(f"Extracting page number from PDF text for file: {file_relative_path}")
     try:
         image_footer = _extract_page_number_from_pdf_image_footer(file_relative_path)
         if image_footer is not None:
@@ -1185,6 +1186,7 @@ async def create_page(
                         created_files.append(current_abs)
                         # Kommentar für jede Seite bestimmen
                         text = reader.pages[i].extract_text() or ""
+                        logging.info("Create Page 3a - Extracted text for Seite %d: %s", i+1, text[:100])  # Log first 100 chars of extracted text
                         page_number = None
                         logging.info("Create Page 4 - Extracting page number for Seite %d", i+1)
                         if hasattr(pages_routes, "_extract_page_number_from_pdf_text"):
