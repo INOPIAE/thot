@@ -1190,7 +1190,7 @@ async def create_page(
                         page_number = None
                         logging.info("Create Page 4 - Extracting page number for Seite %d", i+1)
                         if hasattr(pages_routes, "_extract_page_number_from_pdf_text"):
-                            page_number = pages_routes._extract_page_number_from_pdf_text(text)
+                            page_number = pages_routes._extract_page_number_from_pdf_text(current_abs)
                         if page_number is not None:
                             page_comment = f"Seite: {page_number}"
                         else:
@@ -1328,6 +1328,7 @@ async def create_page(
             pass
         page_number = None
         if hasattr(pages_routes, "_extract_page_number_from_pdf_text"):
+            logging.info("Create page 5")
             page_number = pages_routes._extract_page_number_from_pdf_text(text)
         if page_number is not None:
             final_comment = f"Seite: {page_number}"
