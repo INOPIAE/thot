@@ -15,13 +15,28 @@ CSRF_HEADER_NAME = "x-csrf-token"
 
 # Allow any prefix before /auth/login etc. (e.g. /api/v1/auth/login)
 CSRF_EXEMPT_PATHS = [
+    "/api/v1/auth/login",
+    "/api/v1/auth/logout",
+    "/api/v1/auth/register",
+    "/api/v1/auth/register/confirm",
+    "/api/v1/auth/confirm",
+    "/api/v1/auth/password-reset",
+    "/api/v1/auth/password-reset/confirm",
+    "/api/v1/auth/request-password-reset",
+    "/api/v1/auth/otp-reset",
+    "/api/v1/auth/otp-reset/confirm",
+    "/api/v1/auth/bootstrap",
+    "/api/v1/auth/tos",
     "/auth/login",
     "/auth/logout",
     "/auth/register",
     "/auth/register/confirm",
     "/auth/confirm",
     "/auth/password-reset",
+    "/auth/password-reset/confirm",
     "/auth/request-password-reset",
+    "/auth/otp-reset",
+    "/auth/otp-reset/confirm",
     "/auth/bootstrap",
     "/auth/tos",
     "/openapi.json",
@@ -41,7 +56,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         # Exempt safe methods and exempt paths (robust)
         path = request.url.path
-        if request.method in ("GET", "OPTIONS", "HEAD") or any(path.endswith(p) for p in CSRF_EXEMPT_PATHS):
+        if request.method in ("GET", "OPTIONS", "HEAD") or any(path.startswith(p) for p in CSRF_EXEMPT_PATHS):
             return await call_next(request)
 
         # Get CSRF token from cookie and header

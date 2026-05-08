@@ -150,3 +150,46 @@ def test_support_can_start_password_reset_for_user(client, db, monkeypatch):
 
     token_entry = db.query(PasswordResetToken).filter(PasswordResetToken.userid == target_user.id).first()
     assert token_entry is not None
+
+
+def test_password_reset_confirm_csrf_exempt(client, db, monkeypatch):
+    """
+    Test: POST auf /api/v1/auth/password-reset/confirm/<token> funktioniert ohne CSRF-Header/Cookie (CSRF-Exempt)
+    """
+    _create_role(db, "user")
+    user = _create_user(db, "csrfexempt", "csrfexempt@example.com", "ValidPass123!", "user")
+
+    monkeypatch.setattr(
+        "app.routes.auth.email_service.send_password_reset_email",
+        lambda *args, **kwargs: True,
+    )
+
+    # Passwort-Reset-Request (mit CSRF, wie üblich)
+    headers, cookies = auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+    request_response = client.post(
+        "/api/v1/auth/password-reset",
+        json={"username": "csrfexempt"},
+        headers=headers,
+    )
+    assert request_response.status_code == 200
+
+    token_entry = db.query(PasswordResetToken).filter(PasswordResetToken.userid == user.id).first()
+    assert token_entry is not None
+
+    # Jetzt: POST auf confirm-Endpoint OHNE CSRF-Header/Cookie
+    client.cookies.clear()
+    confirm_response = client.post(
+        f"/api/v1/auth/password-reset/confirm/{token_entry.token}",
+        json={
+            "new_password": "NewValidPassCSRF!",
+            "new_password_confirm": "NewValidPassCSRF!",
+        },
+    )
+    assert confirm_response.status_code == 200
+    db.refresh(token_entry)
+    db.refresh(user)
+    assert token_entry.used is True
+    assert verify_password("NewValidPassCSRF!", user.hashed_password)
