@@ -524,7 +524,6 @@ def _parse_page_number_priority() -> list[str]:
 
 def _extract_page_number_from_pdf_text(file_relative_path: Optional[str]) -> Optional[int]:
     """Extract page number from OCR output using positional zone detection and configurable source priority."""
-    logging.info(f"Extracting page number from PDF text for file: {file_relative_path}")
     try:
         image_footer = _extract_page_number_from_pdf_image_footer(file_relative_path)
         if image_footer is not None:
@@ -1139,7 +1138,6 @@ async def create_page(
     record = db.query(Record).filter(Record.id == record_uuid).first()
     if record:
         record_signature = record.signature
-    logging.info("Create Page 1")
     if file:
         validate_file(file)
         pdf_bytes = file.file.read()
@@ -1149,11 +1147,7 @@ async def create_page(
             if reader.is_encrypted:
                 raise HTTPException(status_code=400, detail="Invalid PDF file: Encrypted PDF files are not supported")
             num_pages = len(reader.pages)
-            # from app.services.page_service import PageService
-            # from pypdf import PdfWriter
-            # from app.routes import pages as pages_routes
-            # import shutil
-            logging.info("Create Page 2")
+
             if num_pages > 1:
                 split_pdf = True
                 created_count = num_pages
@@ -1164,7 +1158,6 @@ async def create_page(
                 created_files = []  # Track all created files for rollback
                 try:
                     for i in range(num_pages):
-                        logging.info("Create Page 3 - Seite %d", i+1)
                         writer = PdfWriter()
                         writer.add_page(reader.pages[i])
                         buffer = BytesIO()
@@ -1186,9 +1179,7 @@ async def create_page(
                         created_files.append(current_abs)
                         # Kommentar für jede Seite bestimmen
                         text = reader.pages[i].extract_text() or ""
-                        logging.info("Create Page 3a - Extracted text for Seite %d: %s", i+1, text[:100])  # Log first 100 chars of extracted text
                         page_number = None
-                        logging.info("Create Page 4 - Extracting page number for Seite %d", i+1)
                         if hasattr(pages_routes, "_extract_page_number_from_pdf_text"):
                             page_number = pages_routes._extract_page_number_from_pdf_text(current_abs)
                         if page_number is not None:
@@ -1258,7 +1249,6 @@ async def create_page(
                         except Exception:
                             pass
                     raise HTTPException(status_code=400, detail=detail)
-                logging.info("Create Page 5")
                 db.commit()
                 # OCR-Job für jede neue Seite erst nach Commit starten
                 for new_page in new_pages:
