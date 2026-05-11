@@ -272,7 +272,9 @@ def _serialize_page(page) -> dict:
         "description": page.description,
         "page": page.page,
         "comment": page.comment,
-        "record_id": str(page.record_id),
+        "record_id": str(page.record_id) if page.record_id else None,
+        "record_title": page.record.title if getattr(page, "record", None) and getattr(page.record, "title", None) else None,
+        "record_signature": page.record.signature if getattr(page, "record", None) and getattr(page.record, "signature", None) else None,
         "orgin_file": page.orgin_file,
         "location_file": page.location_file,
         "current_file": page.current_file,
@@ -281,6 +283,7 @@ def _serialize_page(page) -> dict:
         "restriction_id": str(page.restriction_id),
         "workstatus_id": str(page.workstatus_id) if page.workstatus_id else None,
         "created_on": page.created_on.isoformat() if page.created_on else None,
+        "rotation": page.rotation,
     }
 
 
@@ -1037,6 +1040,7 @@ async def list_pages(
                 "created_by": str(page.created_by) if page.created_by else None,
                 "order_by": page.order_by,
                 "pdf_public_url": build_record_public_url_pdf(page.record_id) if page.record_id else None,
+                "rotation": page.rotation,
             }
             for page in pages
         ],
@@ -1090,6 +1094,7 @@ async def get_page(
         "last_modified_on": page.last_modified_on.isoformat() if page.last_modified_on else None,
         "last_modified_by": str(page.last_modified_by) if page.last_modified_by else None,
         "order_by": page.order_by,
+        "rotation": page.rotation,
     }
 
 
@@ -1104,6 +1109,7 @@ async def create_page(
     restriction_id: str = Form(...),
     workstatus_id: Optional[str] = Form(None),
     order_by: Optional[int] = Form(None),
+    rotation: Optional[int] = Form(0),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
@@ -1337,6 +1343,7 @@ async def create_page(
         location_file=location_file,
         workstatus_id=workstatus_uuid,
         order_by=order_by,
+        rotation=rotation,
     )
     db.commit()
     db.refresh(new_page)
@@ -1373,6 +1380,7 @@ async def create_page(
         "last_modified_on": new_page.last_modified_on.isoformat() if new_page.last_modified_on else None,
         "last_modified_by": str(new_page.last_modified_by) if new_page.last_modified_by else None,
         "order_by": new_page.order_by,
+        "rotation": new_page.rotation,
         "ocr_status": "pending",
         "split_pdf": split_pdf,
         "created_count": created_count,
@@ -1389,6 +1397,7 @@ async def update_page(
     restriction_id: str = Form(...),
     workstatus_id: Optional[str] = Form(None),
     order_by: Optional[int] = Form(None),
+    rotation: Optional[int] = Form(0),
     file: Optional[UploadFile] = File(None),
     delete_file: Optional[bool] = Form(False),
     db: Session = Depends(get_db),
@@ -1453,6 +1462,11 @@ async def update_page(
                 existing_page.order_by = int(order_by)
             except Exception:
                 pass
+        if rotation is not None:
+            try:
+                existing_page.rotation = int(rotation)
+            except Exception:
+                pass
     
     # Handle file deletion
     if delete_file and existing_page.location_file:
@@ -1511,6 +1525,7 @@ async def update_page(
         "orgin_file": existing_page.orgin_file,
         "location_file": existing_page.location_file,
         "current_file": existing_page.current_file,
+        "rotation": existing_page.rotation,
         "ocr_status": _get_ocr_status(existing_page),
         "restriction_file": existing_page.restriction_file,
         "restriction_id": str(existing_page.restriction_id),

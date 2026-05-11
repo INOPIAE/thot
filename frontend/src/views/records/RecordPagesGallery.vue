@@ -80,6 +80,7 @@
                 :src="thumbnailUrls[page.id]"
                 :alt="page.name"
                 class="thumbnail-image"
+                :style="rotationStyle(page)"
                 @error="handleThumbnailError(page.id)"
               />
               <div v-else class="thumbnail-placeholder">
@@ -90,6 +91,9 @@
               </div>
             </div>
             <h3 class="thumbnail-title">{{ page.name }}</h3>
+            <div class="rotation-indicator" v-if="typeof page.rotation === 'number'">
+              {{ $t('pages.rotation') }}: {{ page.rotation }}°
+            </div>
           </div>
         </div>
       </div>
@@ -118,21 +122,12 @@
               {{ $t('common.loading') }} PDF...
             </div>
 
-            <div v-else-if="pdfUrl" class="pdf-viewer-container">
-              <embed
-                :src="pdfUrl"
-                type="application/pdf"
-                class="pdf-embed"
-              />
-            </div>
-
-            <div v-else class="no-pdf">
-              <p>{{ $t('pages.pdfLoadError') }}</p>
+            <div v-else-if="pdfBlob" class="pdf-viewer-container">
+              <PdfJsPageViewer :src="pdfBlob" :rotation="selectedPage.rotation || 0" />
             </div>
           </div>
-
           <div v-else class="no-pdf">
-            <p>{{ $t('pages.noPdfAvailable') }}</p>
+            <p>{{ $t('pages.pdfLoadError') }}</p>
           </div>
         </div>
       </div>
@@ -140,20 +135,19 @@
   </div>
 </template>
 
+
 <script>
-import { pageService } from '@/services/page'
-import { recordService } from '@/services/record'
+import PdfJsPageViewer from '@/components/PdfJsPageViewer.vue'
 import { useAuthStore } from '@/stores/auth'
+import { recordService } from '@/services/record'
+import { pageService } from '@/services/page'
 
 export default {
   name: 'RecordPagesGallery',
-    setup() {
-      return {
-        authStore: useAuthStore(),
-      }
-    },
+  components: { PdfJsPageViewer },
   data() {
     return {
+      authStore: useAuthStore(),
       pages: [],
       selectedPageId: null,
       selectedPage: null,
@@ -164,7 +158,7 @@ export default {
       loadingThumbnails: {},
       error: null,
       thumbnailUrls: {},
-      pdfUrl: null,
+      pdfBlob: null,
       showThumbnails: true,
     }
   },
@@ -187,11 +181,22 @@ export default {
     Object.values(this.thumbnailUrls).forEach(url => {
       if (url) URL.revokeObjectURL(url)
     })
-    if (this.pdfUrl) {
-      URL.revokeObjectURL(this.pdfUrl)
-    }
+    this.pdfBlob = null
+  },
+  beforeUnmount() {
+    // Clean up all blob URLs
+    Object.values(this.thumbnailUrls).forEach(url => {
+      if (url) URL.revokeObjectURL(url)
+    })
+    this.pdfBlob = null
   },
   methods: {
+    rotationStyle(page) {
+      if (page && typeof page.rotation === 'number' && [0,90,180,270].includes(page.rotation) && page.rotation !== 0) {
+        return `transform: rotate(${page.rotation}deg); transition: transform 0.2s;`;
+      }
+      return '';
+    },
     copyCitationLink() {
       if (this.selectedPage && this.selectedPage.pdf_public_url) {
         navigator.clipboard.writeText(this.selectedPage.pdf_public_url)
@@ -287,10 +292,7 @@ export default {
       this.selectedPage = this.pages.find(p => p.id === pageId)
 
       // Clean up old PDF URL
-      if (this.pdfUrl) {
-        URL.revokeObjectURL(this.pdfUrl)
-        this.pdfUrl = null
-      }
+      this.pdfBlob = null
 
       // Load PDF for selected page
       if (this.selectedPage && this.selectedPage.location_file) {
@@ -302,10 +304,10 @@ export default {
       this.loadingPdf = true
       try {
         const blob = await pageService.getViewPdf(pageId)
-        this.pdfUrl = URL.createObjectURL(blob)
+        this.pdfBlob = blob
       } catch (err) {
         console.error('Error loading PDF:', err)
-        this.pdfUrl = null
+        this.pdfBlob = null
       } finally {
         this.loadingPdf = false
       }
@@ -684,4 +686,21 @@ export default {
     height: 100%;
   }
 }
+  .pdf-viewer-rotated {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: auto;
+    background: #222;
+  }
+  .pdf-embed {
+    width: 100%;
+    height: 100%;
+    max-width: 100vw;
+    max-height: 100vh;
+    object-fit: contain;
+    background: #fff;
+  }
 </style>

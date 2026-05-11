@@ -467,6 +467,7 @@ export const messages = {
     // Pages
     pages: {
       title: 'Pages',
+      rotation: 'Rotation',
       pageListTitle: 'Pages for Object',
       pageDetail: 'Page Details',
       managePages: 'Manage Pages',
@@ -1064,6 +1065,7 @@ export const messages = {
     // Pages
     pages: {
       title: 'Seiten',
+      rotation: 'Rotation',
       pageListTitle: 'Seiten für Objekt',
       pageDetail: 'Seitendetails',
       managePages: 'Seiten verwalten',

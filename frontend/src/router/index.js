@@ -1,7 +1,3 @@
-import { fetchAppConfig } from '@/services/config'
-/**
- * Vue Router Configuration
- */
 /**
  * Vue Router Configuration
  */

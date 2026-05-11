@@ -132,11 +132,14 @@
           <div class="pdf-thumbnail-section">
             <h3>{{ $t('pages.thumbnail') }}</h3>
             <div class="thumbnail-container">
-              <iframe
+              <img
+                v-if="pdfThumbnailUrl"
                 :src="pdfThumbnailUrl"
+                :style="rotationStyle"
                 class="pdf-thumbnail"
-                :title="$t('pages.pdfThumbnail')"
+                :alt="$t('pages.pdfThumbnail')"
               />
+              <span v-else>{{ $t('pages.noThumbnail') }}</span>
               <div class="thumbnail-overlay">
                 <a
                   :href="pdfViewerUrl"
@@ -146,6 +149,9 @@
                   {{ $t('pages.openInNewTab') }}
                 </a>
               </div>
+            </div>
+            <div class="rotation-indicator" v-if="page && typeof page.rotation === 'number'">
+              {{ $t('pages.rotation') }}: {{ page.rotation }}°
             </div>
           </div>
 
@@ -169,11 +175,15 @@
               </a>
             </div>
             <div class="pdf-viewer-container">
-              <iframe
-                :src="pdfViewerUrl"
-                class="pdf-viewer"
-                :title="page.name"
+              <PdfJsPageViewer
+                v-if="pdfBlobUrl"
+                :src="pdfBlobUrl"
+                :rotation="page?.rotation || 0"
+                style="width:100%;max-width:900px;margin:auto;"
               />
+              <div v-else class="no-pdf">
+                <p>{{ $t('pages.noPdfAvailable') }}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -185,14 +195,16 @@
 <script>
 import { pageService } from '@/services/page'
 import { useAuthStore } from '@/stores/auth'
+import PdfJsPageViewer from '@/components/PdfJsPageViewer.vue'
 
 export default {
   name: 'PageViewer',
-    setup() {
-      return {
-        authStore: useAuthStore(),
-      }
-    },
+  components: { PdfJsPageViewer },
+  setup() {
+    return {
+      authStore: useAuthStore(),
+    }
+  },
   data() {
     return {
       page: null,

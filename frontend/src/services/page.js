@@ -1,4 +1,4 @@
-import api from './api'
+import api from './api.js'
 
 export const pageService = {
   /**
@@ -53,6 +53,7 @@ export const pageService = {
       if (data.comment) formData.append('comment', data.comment)
       if (data.workstatus_id) formData.append('workstatus_id', data.workstatus_id)
       if (data.order_by !== undefined && data.order_by !== null) formData.append('order_by', data.order_by)
+      if (data.rotation !== undefined) formData.append('rotation', data.rotation)
 
       // Add file if provided
       if (data.file) {
@@ -86,6 +87,7 @@ export const pageService = {
       if (data.comment) formData.append('comment', data.comment)
       if (data.workstatus_id) formData.append('workstatus_id', data.workstatus_id)
       if (data.order_by !== undefined && data.order_by !== null) formData.append('order_by', data.order_by)
+      if (data.rotation !== undefined) formData.append('rotation', data.rotation)
       if (data.delete_file !== undefined) formData.append('delete_file', data.delete_file)
 
       // Add file if provided

@@ -123,6 +123,31 @@
         <label v-if="isEditMode && hasCurrentFile" class="checkbox-label">
           <input v-model="form.delete_file" type="checkbox" /> {{ $t('pages.removeCurrentFile') }}
         </label>
+
+        <!-- Thumbnail und Rotation -->
+        <div v-if="isEditMode && hasCurrentFile" class="rotation-thumbnail-group">
+          <div class="thumbnail-rotation-row">
+            <button type="button" class="btn btn-light btn-sm" @click="rotateLeft" :disabled="submitting">
+              ⟲
+            </button>
+            <div class="thumbnail-preview-wrapper">
+              <img
+                v-if="thumbnailUrl"
+                :src="thumbnailUrl"
+                :style="rotationStyle"
+                class="thumbnail-preview"
+                :alt="$t('pages.pdfThumbnail')"
+              />
+              <span v-else>{{ $t('pages.noThumbnail') }}</span>
+            </div>
+            <button type="button" class="btn btn-light btn-sm" @click="rotateRight" :disabled="submitting">
+              ⟳
+            </button>
+          </div>
+          <div class="rotation-indicator">
+            {{ $t('pages.rotation') }}: {{ form.rotation }}°
+          </div>
+        </div>
       </div>
 
       <div class="form-actions">
@@ -138,19 +163,17 @@
 </template>
 
 <script>
+
 import { recordService } from '@/services/record'
 import { pageService } from '@/services/page'
 import { useAuthStore } from '@/stores/auth'
 
+
 export default {
   name: 'PageForm',
-  setup() {
-    return {
-      authStore: useAuthStore(),
-    }
-  },
   data() {
     return {
+      authStore: useAuthStore(),
       loading: false,
       submitting: false,
       error: null,
@@ -171,7 +194,9 @@ export default {
         workstatus_id: '',
         order_by: null,
         delete_file: false,
+        rotation: 0,
       },
+      thumbnailUrl: null,
     }
   },
   computed: {
@@ -196,17 +221,29 @@ export default {
     isUploadOnlyMode() {
       return this.isEditMode && !this.canEditPage && this.canManageFile
     },
+    rotationStyle() {
+      return this.form.rotation ? `transform: rotate(${this.form.rotation}deg);` : ''
+    },
   },
   mounted() {
+    if (!this.recordId) {
+      this.error = this.$t('pages.loadError') + ': recordId missing in URL.'
+      return
+    }
     this.loadMetadata()
     if (this.isEditMode) {
       this.loadPage()
+      // Im Edit-Modus KEIN loadRecordInfo(), da Infos aus Page kommen
     } else {
       this.loadRecordInfo()
     }
   },
   methods: {
     async loadRecordInfo() {
+      if (!this.recordId) {
+        this.error = this.$t('pages.loadError') + ': recordId missing in URL.'
+        return
+      }
       try {
         const record = await recordService.getRecord(this.recordId)
         this.pageRecordTitle = record.title || ''
@@ -247,9 +284,20 @@ export default {
         this.form.restriction_id = page.restriction_id || ''
         this.form.workstatus_id = page.workstatus_id || ''
         this.form.order_by = page.order_by !== undefined && page.order_by !== null ? page.order_by : null
+        this.form.rotation = typeof page.rotation === 'number' ? page.rotation : 0
         this.hasCurrentFile = !!page.location_file
         this.pageRecordTitle = page.record_title || ''
         this.pageRecordSignature = page.record_signature || ''
+        // Lade Thumbnail
+        if (this.hasCurrentFile) {
+          try {
+            const blob = await pageService.getThumbnail(this.pageId, 200)
+            if (this.thumbnailUrl) URL.revokeObjectURL(this.thumbnailUrl)
+            this.thumbnailUrl = URL.createObjectURL(blob)
+          } catch {
+            this.thumbnailUrl = null
+          }
+        }
       } catch (err) {
         this.error = err.message || this.$t('pages.loadError')
       } finally {
@@ -307,6 +355,7 @@ export default {
           workstatus_id: this.form.workstatus_id || null,
           order_by: this.form.order_by,
           file: this.selectedFile,
+          rotation: this.form.rotation,
         }
 
         if (this.isEditMode) {
@@ -319,6 +368,7 @@ export default {
             payload.comment = page.comment || null
             payload.restriction_id = page.restriction_id
             payload.workstatus_id = page.workstatus_id || null
+            payload.rotation = typeof page.rotation === 'number' ? page.rotation : 0
           }
           payload.delete_file = this.form.delete_file
           await pageService.updatePage(this.pageId, payload)
@@ -333,6 +383,23 @@ export default {
         this.submitting = false
       }
     },
+
+    rotateLeft() {
+      this.form.rotation = (this.form.rotation + 270) % 360
+      if (![0, 90, 180, 270].includes(this.form.rotation)) {
+        this.form.rotation = 0
+      }
+    },
+    rotateRight() {
+      this.form.rotation = (this.form.rotation + 90) % 360
+      if (![0, 90, 180, 270].includes(this.form.rotation)) {
+        this.form.rotation = 0
+      }
+    },
+  },
+  // ...
+  beforeUnmount() {
+    if (this.thumbnailUrl) URL.revokeObjectURL(this.thumbnailUrl)
   },
 }
 </script>

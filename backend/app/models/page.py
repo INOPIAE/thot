@@ -35,6 +35,8 @@ class Page(BaseModel):
     workstatus_id = Column(UUID(as_uuid=True), ForeignKey("workstatuses.id"), nullable=True)
     order_by = Column(sa.Integer, nullable=True)
 
+    rotation = Column(sa.Integer, nullable=False, default=0, server_default="0")
+
     # Relationships
     record = relationship("Record", back_populates="pages")
     restriction = relationship("Restriction", back_populates="pages")
