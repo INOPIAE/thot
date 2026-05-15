@@ -441,6 +441,272 @@ def test_update_page_rejects_multi_page_pdf(client, db, tmp_path, monkeypatch):
     assert "Only single-page PDFs are allowed" in update_response.json()["detail"]
 
 
+def test_update_page_uploads_restriction_pdf_with_derived_filename(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+
+    user = _create_user_with_role(db, "page_restriction_upload_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Restricted Signature")
+    headers, cookies = _auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+
+    create_response = client.post(
+        "/api/v1/pages",
+        headers=headers,
+        data={
+            "name": "Restricted Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("single.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert create_response.status_code == 200
+    page_id = create_response.json()["id"]
+
+    update_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=headers,
+        data={
+            "name": "Restricted Page",
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "restriction_file": ("restriction.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["restriction_file"].startswith("Restricted_Signature/restriction/Seite_")
+    assert payload["restriction_file"].endswith("_restricted.pdf")
+    assert (tmp_path / payload["restriction_file"]).exists()
+
+    persisted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
+    assert persisted_page is not None
+    assert persisted_page.restriction_file == payload["restriction_file"]
+
+    view_response = client.get(f"/api/v1/pages/{page_id}/view-restriction-pdf", headers=headers)
+    assert view_response.status_code == 200
+    assert view_response.headers["content-type"] == "application/pdf"
+
+    download_response = client.get(f"/api/v1/pages/{page_id}/download-restriction-pdf", headers=headers)
+    assert download_response.status_code == 200
+    assert "_restricted.pdf" in download_response.headers["content-disposition"]
+
+
+def test_update_page_rejects_multi_page_restriction_pdf(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+
+    user = _create_user_with_role(db, "page_restriction_multi_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id)
+    headers, cookies = _auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+
+    create_response = client.post(
+        "/api/v1/pages",
+        headers=headers,
+        data={
+            "name": "Restriction Target",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("single.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert create_response.status_code == 200
+    page_id = create_response.json()["id"]
+
+    update_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=headers,
+        data={
+            "name": "Restriction Target",
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "restriction_file": ("restriction-multi.pdf", _build_pdf(2), "application/pdf"),
+        },
+    )
+
+    assert update_response.status_code == 400
+    assert "Only single-page PDFs are allowed" in update_response.json()["detail"]
+
+
+def test_update_page_can_rotate_and_delete_restriction_pdf(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+
+    user = _create_user_with_role(db, "page_restriction_rotate_delete_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Restricted Rotation Signature")
+    headers, cookies = _auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+
+    create_response = client.post(
+        "/api/v1/pages",
+        headers=headers,
+        data={
+            "name": "Restriction Rotate Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("single.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert create_response.status_code == 200
+    page_id = create_response.json()["id"]
+
+    upload_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=headers,
+        data={
+            "name": "Restriction Rotate Page",
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+            "rotation_restriction": 90,
+        },
+        files={
+            "restriction_file": ("restriction.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+    assert upload_payload["restriction_file"]
+    assert upload_payload["rotation_restriction"] == 90
+
+    persisted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
+    assert persisted_page is not None
+    assert persisted_page.rotation_restriction == 90
+    assert persisted_page.restriction_file is not None
+    assert (tmp_path / persisted_page.restriction_file).exists()
+
+    delete_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=headers,
+        data={
+            "name": "Restriction Rotate Page",
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+            "rotation_restriction": 180,
+            "delete_restriction_file": True,
+        },
+    )
+
+    assert delete_response.status_code == 200
+    delete_payload = delete_response.json()
+    assert delete_payload["restriction_file"] is None
+    assert delete_payload["rotation_restriction"] == 180
+
+    db.expire_all()
+    deleted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
+    assert deleted_page is not None
+    assert deleted_page.restriction_file is None
+    assert deleted_page.rotation_restriction == 180
+
+
+def test_gallery_endpoints_prefer_restriction_pdf_when_present(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+
+    thumbnail_sources = []
+    combined_sources = []
+
+    def _fake_thumbnail_with_watermark(*, source_pdf, **kwargs):
+        thumbnail_sources.append(Path(source_pdf).name)
+        image = Image.new("RGB", (32, 32), color=(255, 255, 255))
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG")
+        return buffer.getvalue()
+
+    def _fake_watermarked_pdf(*, source_pdf, **kwargs):
+        combined_sources.append(Path(source_pdf).name)
+        return _build_pdf(1)
+
+    monkeypatch.setattr(
+        "app.services.pdf_watermark_service.create_thumbnail_with_watermark",
+        _fake_thumbnail_with_watermark,
+    )
+    monkeypatch.setattr(
+        "app.services.pdf_watermark_service.create_watermarked_pdf",
+        _fake_watermarked_pdf,
+    )
+
+    user = _create_user_with_role(db, "page_gallery_restriction_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Gallery Restriction Signature")
+    headers, cookies = _auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+
+    create_response = client.post(
+        "/api/v1/pages",
+        headers=headers,
+        data={
+            "name": "Gallery Restriction Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("single.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert create_response.status_code == 200
+    page_id = create_response.json()["id"]
+
+    update_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=headers,
+        data={
+            "name": "Gallery Restriction Page",
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "restriction_file": ("restriction.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert update_response.status_code == 200
+
+    thumbnail_response = client.get(
+        f"/api/v1/pages/{page_id}/thumbnail",
+        headers=headers,
+        params={"prefer_restriction": True},
+    )
+    assert thumbnail_response.status_code == 200
+    assert thumbnail_sources
+    assert thumbnail_sources[-1].endswith("_restricted.pdf")
+
+    combined_response = client.get(
+        f"/api/v1/records/{record.id}/download-combined-pdf",
+        headers=headers,
+    )
+    assert combined_response.status_code == 200
+    assert combined_sources
+    assert combined_sources[-1].endswith("_restricted.pdf")
+
+
 def test_e2e_current_file_is_set_on_create_and_update(client, db, tmp_path, monkeypatch):
     monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
     monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)

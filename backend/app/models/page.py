@@ -36,6 +36,7 @@ class Page(BaseModel):
     order_by = Column(sa.Integer, nullable=True)
 
     rotation = Column(sa.Integer, nullable=False, default=0, server_default="0")
+    rotation_restriction = Column(sa.Integer, nullable=False, default=0, server_default="0")
 
     # Relationships
     record = relationship("Record", back_populates="pages")

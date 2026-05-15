@@ -16,7 +16,7 @@
         </button>
         <div>
           <h1>{{ $t('pages.galleryTitle') }}: {{ recordTitle }}</h1>
-          <div v-if="selectedPage && selectedPage.pdf_public_url" class="citation-link citation-link-row">
+          <div v-if="showCitationLink" class="citation-link citation-link-row">
             <span style="margin-right: 0.5rem;">{{ $t('records.citationLink') }}</span>
             <a
               :href="selectedPage.pdf_public_url"
@@ -76,7 +76,7 @@
           >
             <div class="thumbnail-wrapper">
               <img
-                v-if="page.location_file && thumbnailUrls[page.id]"
+                v-if="pageHasDisplayPdf(page) && thumbnailUrls[page.id]"
                 :src="thumbnailUrls[page.id]"
                 :alt="page.name"
                 class="thumbnail-image"
@@ -91,8 +91,8 @@
               </div>
             </div>
             <h3 class="thumbnail-title">{{ page.name }}</h3>
-            <div class="rotation-indicator" v-if="typeof page.rotation === 'number'">
-              {{ $t('pages.rotation') }}: {{ page.rotation }}°
+            <div class="rotation-indicator" v-if="typeof getDisplayRotation(page) === 'number'">
+              {{ $t('pages.rotation') }}: {{ getDisplayRotation(page) }}°
             </div>
           </div>
         </div>
@@ -110,20 +110,20 @@
             <button
               class="btn btn-primary"
               @click="downloadPdf"
-              :disabled="!selectedPage.location_file || loadingPdf"
+              :disabled="!pageHasDisplayPdf(selectedPage) || loadingPdf"
             >
               {{ $t('pages.downloadPdf') }}
             </button>
           </div>
 
           <!-- PDF Viewer -->
-          <div v-if="selectedPage.location_file" class="pdf-viewer-section">
+          <div v-if="pageHasDisplayPdf(selectedPage)" class="pdf-viewer-section">
             <div v-if="loadingPdf" class="loading-pdf">
               {{ $t('common.loading') }} PDF...
             </div>
 
             <div v-else-if="pdfBlob" class="pdf-viewer-container">
-              <PdfJsPageViewer :src="pdfBlob" :rotation="selectedPage.rotation || 0" />
+              <PdfJsPageViewer :src="pdfBlob" :rotation="getDisplayRotation(selectedPage)" />
             </div>
           </div>
           <div v-else class="no-pdf">
@@ -166,6 +166,9 @@ export default {
     recordId() {
       return this.$route.params.recordId
     },
+    showCitationLink() {
+      return !!(this.selectedPage && this.selectedPage.pdf_public_url && !this.selectedPage.restriction_file)
+    },
     canManagePages() {
       return this.authStore.hasRole('admin') ||
              this.authStore.hasRole('user_scan') ||
@@ -191,11 +194,29 @@ export default {
     this.pdfBlob = null
   },
   methods: {
-    rotationStyle(page) {
-      if (page && typeof page.rotation === 'number' && [0,90,180,270].includes(page.rotation) && page.rotation !== 0) {
-        return `transform: rotate(${page.rotation}deg); transition: transform 0.2s;`;
+    pageHasDisplayPdf(page) {
+      return !!(page && (page.restriction_file || page.current_file || page.location_file))
+    },
+    pageUsesRestrictionPdf(page) {
+      return !!(page && page.restriction_file)
+    },
+    getDisplayRotation(page) {
+      if (!page) {
+        return 0
       }
-      return '';
+
+      const rotation = this.pageUsesRestrictionPdf(page)
+        ? page.rotation_restriction
+        : page.rotation
+
+      return [0, 90, 180, 270].includes(rotation) ? rotation : 0
+    },
+    rotationStyle(page) {
+      const rotation = this.getDisplayRotation(page)
+      if (rotation !== 0) {
+        return `transform: rotate(${rotation}deg); transition: transform 0.2s;`
+      }
+      return ''
     },
     copyCitationLink() {
       if (this.selectedPage && this.selectedPage.pdf_public_url) {
@@ -248,7 +269,7 @@ export default {
         
         // Load thumbnails for all pages
         this.pages.forEach(page => {
-          if (page.location_file) {
+          if (this.pageHasDisplayPdf(page)) {
             this.loadThumbnail(page.id)
           }
         })
@@ -272,7 +293,8 @@ export default {
 
       this.loadingThumbnails[pageId] = true
       try {
-        const blob = await pageService.getThumbnail(pageId, 200)
+        const page = this.pages.find((item) => item.id === pageId)
+        const blob = await pageService.getThumbnail(pageId, 200, this.pageUsesRestrictionPdf(page))
         const url = URL.createObjectURL(blob)
         this.thumbnailUrls[pageId] = url
       } catch (err) {
@@ -295,7 +317,7 @@ export default {
       this.pdfBlob = null
 
       // Load PDF for selected page
-      if (this.selectedPage && this.selectedPage.location_file) {
+      if (this.pageHasDisplayPdf(this.selectedPage)) {
         await this.loadPdf(pageId)
       }
     },
@@ -303,7 +325,10 @@ export default {
     async loadPdf(pageId) {
       this.loadingPdf = true
       try {
-        const blob = await pageService.getViewPdf(pageId)
+        const page = this.pages.find((item) => item.id === pageId)
+        const blob = this.pageUsesRestrictionPdf(page)
+          ? await pageService.getRestrictionViewPdf(pageId)
+          : await pageService.getViewPdf(pageId)
         this.pdfBlob = blob
       } catch (err) {
         console.error('Error loading PDF:', err)
@@ -319,7 +344,9 @@ export default {
       }
 
       try {
-        const { blob, contentDisposition } = await pageService.downloadWatermarkedPdf(this.selectedPageId)
+        const { blob, contentDisposition } = this.pageUsesRestrictionPdf(this.selectedPage)
+          ? await pageService.downloadRestrictionPdf(this.selectedPageId)
+          : await pageService.downloadWatermarkedPdf(this.selectedPageId)
         
         // Extract filename from content-disposition or use page name
         let filename = `${(this.selectedPage.name || 'page').replace(/\s+/g, '_')}.pdf`

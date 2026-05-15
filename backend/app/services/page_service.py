@@ -176,6 +176,7 @@ class PageService:
         workstatus_id: str = None,
         order_by: int = None,
         rotation: int = 0,
+        rotation_restriction: int = 0,
     ) -> Page:
         """Create a new page"""
         new_page = Page(
@@ -191,6 +192,7 @@ class PageService:
             created_by=user_id,
             last_modified_by=user_id,
             rotation=rotation,
+            rotation_restriction=rotation_restriction,
         )
         db.add(new_page)
         db.flush()
@@ -207,6 +209,7 @@ class PageService:
         comment: str = None,
         restriction_id: str = None,
         rotation: int = None,
+        rotation_restriction: int = None,
     ) -> Page:
         """Update an existing page"""
         if name is not None:
@@ -221,6 +224,8 @@ class PageService:
             page.restriction_id = restriction_id
         if rotation is not None:
             page.rotation = rotation
+        if rotation_restriction is not None:
+            page.rotation_restriction = rotation_restriction
         page.last_modified_by = user_id
         page.last_modified_on = datetime.now(timezone.utc)
         db.flush()

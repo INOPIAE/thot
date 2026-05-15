@@ -173,6 +173,83 @@
         </div>
       </div>
 
+      <div class="form-group" v-if="isEditMode && canManageFile">
+        <label for="restriction-file">{{ $t('pages.uploadRestrictionFile') }}</label>
+        <input id="restriction-file" type="file" class="form-control" accept="application/pdf,.pdf" @change="onRestrictionFileChange" />
+        <small class="form-text">
+          {{ selectedRestrictionFileName || $t('pages.noRestrictionFileSelected') }}
+        </small>
+        <small v-if="!restrictionFilePageError" class="form-text text-warning">
+          {{ $t('pages.restrictionUploadSinglePageOnly') }}
+        </small>
+        <small v-if="restrictionFilePageError" class="form-text text-danger">{{ restrictionFilePageError }}</small>
+        <small class="form-text">
+          {{ $t('pages.restrictionFile') }}: {{ hasRestrictionFile ? $t('common.yes') : $t('common.no') }}
+        </small>
+        <label v-if="hasRestrictionFile" class="checkbox-label">
+          <input v-model="form.delete_restriction_file" type="checkbox" /> {{ $t('pages.removeRestrictionFile') }}
+        </label>
+
+        <div v-if="hasRestrictionFile" class="rotation-thumbnail-group restriction-rotation-group">
+          <div class="thumbnail-rotation-row">
+            <button type="button" class="btn btn-light btn-sm" @click="rotateRestrictionLeft" :disabled="submitting">
+              ⟲
+            </button>
+            <span class="rotation-preview-label">{{ $t('pages.restrictionPdfDocument') }}</span>
+            <button type="button" class="btn btn-light btn-sm" @click="rotateRestrictionRight" :disabled="submitting">
+              ⟳
+            </button>
+          </div>
+          <div class="rotation-indicator">
+            {{ $t('pages.restrictionRotation') }}: {{ form.rotation_restriction }}°
+          </div>
+        </div>
+      </div>
+
+      <div v-if="isEditMode && canViewManagedFiles && (hasCurrentFile || hasRestrictionFile)" class="pdf-preview-grid">
+        <section v-if="hasCurrentFile" class="pdf-preview-card">
+          <div class="pdf-preview-header">
+            <h2>{{ $t('pages.currentPdfDocument') }}</h2>
+            <div class="pdf-preview-actions">
+              <button type="button" class="btn btn-sm btn-primary" @click="downloadCurrentPdf">
+                {{ $t('pages.downloadCurrentPdf') }}
+              </button>
+            </div>
+          </div>
+          <div class="pdf-preview-viewer">
+            <PdfJsPageViewer
+              v-if="currentPdfBlobUrl"
+              :src="currentPdfBlobUrl"
+              :rotation="form.rotation || 0"
+            />
+            <div v-else class="pdf-preview-placeholder">
+              {{ $t('common.loading') }}
+            </div>
+          </div>
+        </section>
+
+        <section v-if="hasRestrictionFile" class="pdf-preview-card">
+          <div class="pdf-preview-header">
+            <h2>{{ $t('pages.restrictionPdfDocument') }}</h2>
+            <div class="pdf-preview-actions">
+              <button type="button" class="btn btn-sm btn-primary" @click="downloadRestrictionPdf">
+                {{ $t('pages.downloadRestrictionPdf') }}
+              </button>
+            </div>
+          </div>
+          <div class="pdf-preview-viewer">
+            <PdfJsPageViewer
+              v-if="restrictionPdfBlobUrl"
+              :src="restrictionPdfBlobUrl"
+              :rotation="form.rotation_restriction || 0"
+            />
+            <div v-else class="pdf-preview-placeholder">
+              {{ $t('common.loading') }}
+            </div>
+          </div>
+        </section>
+      </div>
+
       <div class="form-actions">
         <button type="submit" class="btn btn-primary" :disabled="submitting">
           {{ submitting ? $t('common.saving') : $t('common.save') }}
@@ -237,10 +314,14 @@
 import { recordService } from '@/services/record'
 import { pageService } from '@/services/page'
 import { useAuthStore } from '@/stores/auth'
+import PdfJsPageViewer from '@/components/PdfJsPageViewer.vue'
 
 
 export default {
   name: 'PageForm',
+  components: {
+    PdfJsPageViewer,
+  },
   beforeRouteLeave(to, from, next) {
     if (this.shouldBlockNavigation(to.fullPath)) {
       this.openUnsavedChangesDialog(to.fullPath)
@@ -264,11 +345,15 @@ export default {
       submitting: false,
       error: null,
       filePageError: null,
+      restrictionFilePageError: null,
       restrictions: [],
       workstatuses: [],
       selectedFile: null,
       selectedFileName: '',
+      selectedRestrictionFile: null,
+      selectedRestrictionFileName: '',
       hasCurrentFile: false,
+      hasRestrictionFile: false,
       pageRecordTitle: '',
       pageRecordSignature: '',
       pageSequence: [],
@@ -285,9 +370,13 @@ export default {
         workstatus_id: '',
         order_by: null,
         delete_file: false,
+        delete_restriction_file: false,
         rotation: 0,
+        rotation_restriction: 0,
       },
       thumbnailUrl: null,
+      currentPdfBlobUrl: null,
+      restrictionPdfBlobUrl: null,
     }
   },
   computed: {
@@ -320,6 +409,9 @@ export default {
     },
     canManageFile() {
       return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
+    },
+    canViewManagedFiles() {
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_page') || this.authStore.hasRole('user_scan')
     },
     isUploadOnlyMode() {
       return this.isEditMode && !this.canEditPage && this.canManageFile
@@ -366,12 +458,21 @@ export default {
         workstatus_id: this.form.workstatus_id,
         order_by: this.form.order_by !== undefined && this.form.order_by !== null ? this.form.order_by : null,
         delete_file: !!this.form.delete_file,
+        delete_restriction_file: !!this.form.delete_restriction_file,
         rotation: this.form.rotation || 0,
+        rotation_restriction: this.form.rotation_restriction || 0,
         selected_file: this.selectedFile
           ? {
               name: this.selectedFile.name,
               size: this.selectedFile.size,
               lastModified: this.selectedFile.lastModified,
+            }
+          : null,
+        selected_restriction_file: this.selectedRestrictionFile
+          ? {
+              name: this.selectedRestrictionFile.name,
+              size: this.selectedRestrictionFile.size,
+              lastModified: this.selectedRestrictionFile.lastModified,
             }
           : null,
       }
@@ -383,6 +484,21 @@ export default {
       this.selectedFile = null
       this.selectedFileName = ''
       this.filePageError = null
+    },
+    resetSelectedRestrictionFileState() {
+      this.selectedRestrictionFile = null
+      this.selectedRestrictionFileName = ''
+      this.restrictionFilePageError = null
+    },
+    revokePdfUrls() {
+      if (this.currentPdfBlobUrl) {
+        URL.revokeObjectURL(this.currentPdfBlobUrl)
+        this.currentPdfBlobUrl = null
+      }
+      if (this.restrictionPdfBlobUrl) {
+        URL.revokeObjectURL(this.restrictionPdfBlobUrl)
+        this.restrictionPdfBlobUrl = null
+      }
     },
     async handleRouteContextChange() {
       if (!this.recordId) {
@@ -397,8 +513,12 @@ export default {
 
       this.pageSequence = []
       this.resetSelectedFileState()
+      this.resetSelectedRestrictionFileState()
       this.hasCurrentFile = false
+      this.hasRestrictionFile = false
+      this.revokePdfUrls()
       this.form.delete_file = false
+      this.form.delete_restriction_file = false
       this.captureInitialFormSnapshot()
       this.loadRecordInfo()
     },
@@ -482,7 +602,10 @@ export default {
       this.error = null
       try {
         this.resetSelectedFileState()
+        this.resetSelectedRestrictionFileState()
+        this.revokePdfUrls()
         this.form.delete_file = false
+        this.form.delete_restriction_file = false
         const page = await pageService.getPage(this.pageId)
         this.form.name = page.name || ''
         this.form.description = page.description || ''
@@ -492,7 +615,9 @@ export default {
         this.form.workstatus_id = page.workstatus_id || ''
         this.form.order_by = page.order_by !== undefined && page.order_by !== null ? page.order_by : null
         this.form.rotation = typeof page.rotation === 'number' ? page.rotation : 0
-        this.hasCurrentFile = !!page.location_file
+        this.form.rotation_restriction = typeof page.rotation_restriction === 'number' ? page.rotation_restriction : 0
+        this.hasCurrentFile = !!(page.current_file || page.location_file)
+        this.hasRestrictionFile = !!page.restriction_file
         this.pageRecordTitle = page.record_title || ''
         this.pageRecordSignature = page.record_signature || ''
         // Lade Thumbnail
@@ -504,6 +629,12 @@ export default {
           } catch {
             this.thumbnailUrl = null
           }
+        }
+        if (this.canViewManagedFiles) {
+          await Promise.all([
+            this.loadCurrentPdfPreview(),
+            this.loadRestrictionPdfPreview(),
+          ])
         }
         this.captureInitialFormSnapshot()
       } catch (err) {
@@ -582,26 +713,113 @@ export default {
       this.filePageError = null
 
       if (file && this.isEditMode) {
-        const reader = new FileReader()
-        reader.onload = (e) => {
-          try {
-            const bytes = new Uint8Array(e.target.result)
-            const text = new TextDecoder('latin1').decode(bytes)
-            // Count individual page objects: /Type /Page (not /Pages)
-            const matches = text.match(/\/Type\s*\/Page[^s]/g)
-            const pageCount = matches ? matches.length : 0
-            if (pageCount > 1) {
-              this.filePageError = this.$t('pages.uploadSinglePageError')
-              this.selectedFile = null
-              this.selectedFileName = ''
-              event.target.value = ''
-            }
-          } catch {
-            // If we can't parse, let the backend validate
-          }
-        }
-        reader.readAsArrayBuffer(file)
+        this.validateSinglePagePdfSelection(file, event, {
+          setError: (message) => {
+            this.filePageError = message
+          },
+          clearSelection: () => {
+            this.selectedFile = null
+            this.selectedFileName = ''
+          },
+        })
       }
+    },
+    onRestrictionFileChange(event) {
+      const file = event.target.files?.[0]
+      this.selectedRestrictionFile = file || null
+      this.selectedRestrictionFileName = file?.name || ''
+      this.restrictionFilePageError = null
+
+      if (file) {
+        this.validateSinglePagePdfSelection(file, event, {
+          setError: (message) => {
+            this.restrictionFilePageError = message
+          },
+          clearSelection: () => {
+            this.selectedRestrictionFile = null
+            this.selectedRestrictionFileName = ''
+          },
+        })
+      }
+    },
+    validateSinglePagePdfSelection(file, event, handlers) {
+      const reader = new FileReader()
+      reader.onload = (loadEvent) => {
+        try {
+          const bytes = new Uint8Array(loadEvent.target.result)
+          const text = new TextDecoder('latin1').decode(bytes)
+          const matches = text.match(/\/Type\s*\/Page[^s]/g)
+          const pageCount = matches ? matches.length : 0
+          if (pageCount > 1) {
+            handlers.setError(this.$t('pages.uploadSinglePageError'))
+            handlers.clearSelection()
+            event.target.value = ''
+          }
+        } catch {
+          // If we can't parse, let the backend validate
+        }
+      }
+      reader.readAsArrayBuffer(file)
+    },
+    async loadCurrentPdfPreview() {
+      if (!this.pageId || !this.hasCurrentFile) {
+        return
+      }
+      try {
+        const blob = await pageService.getViewPdf(this.pageId)
+        if (this.currentPdfBlobUrl) {
+          URL.revokeObjectURL(this.currentPdfBlobUrl)
+        }
+        this.currentPdfBlobUrl = URL.createObjectURL(blob)
+      } catch {
+        this.currentPdfBlobUrl = null
+      }
+    },
+    async loadRestrictionPdfPreview() {
+      if (!this.pageId || !this.hasRestrictionFile) {
+        return
+      }
+      try {
+        const blob = await pageService.getRestrictionViewPdf(this.pageId)
+        if (this.restrictionPdfBlobUrl) {
+          URL.revokeObjectURL(this.restrictionPdfBlobUrl)
+        }
+        this.restrictionPdfBlobUrl = URL.createObjectURL(blob)
+      } catch {
+        this.restrictionPdfBlobUrl = null
+      }
+    },
+    async downloadCurrentPdf() {
+      try {
+        const { blob, contentDisposition } = await pageService.downloadWatermarkedPdf(this.pageId)
+        this.triggerBlobDownload(blob, contentDisposition, `${(this.form.name || 'page').replace(/\s+/g, '_')}.pdf`)
+      } catch (err) {
+        this.error = err.message || this.$t('pages.loadError')
+      }
+    },
+    async downloadRestrictionPdf() {
+      try {
+        const { blob, contentDisposition } = await pageService.downloadRestrictionPdf(this.pageId)
+        this.triggerBlobDownload(blob, contentDisposition, `${(this.form.name || 'page').replace(/\s+/g, '_')}_restricted.pdf`)
+      } catch (err) {
+        this.error = err.message || this.$t('pages.loadError')
+      }
+    },
+    triggerBlobDownload(blob, contentDisposition, fallbackName) {
+      const fileName = this.extractFilename(contentDisposition) || fallbackName
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    },
+    extractFilename(contentDisposition) {
+      if (!contentDisposition) return null
+      const match = contentDisposition.match(/filename="?([^";]+)"?/i)
+      return match ? match[1] : null
     },
     async handleSubmit(options = {}) {
       if ((!this.isEditMode && !this.canCreatePage) || (this.isEditMode && !this.canEditPage && !this.canManageFile)) {
@@ -609,7 +827,7 @@ export default {
         return
       }
 
-      if (this.filePageError) {
+      if (this.filePageError || this.restrictionFilePageError) {
         return
       }
 
@@ -626,7 +844,9 @@ export default {
           workstatus_id: this.form.workstatus_id || null,
           order_by: this.form.order_by,
           file: this.selectedFile,
+          restriction_file: this.selectedRestrictionFile,
           rotation: this.form.rotation,
+          rotation_restriction: this.form.rotation_restriction,
         }
 
         if (this.isEditMode) {
@@ -640,15 +860,19 @@ export default {
             payload.restriction_id = page.restriction_id
             payload.workstatus_id = page.workstatus_id || null
             payload.rotation = typeof page.rotation === 'number' ? page.rotation : 0
+            payload.rotation_restriction = typeof page.rotation_restriction === 'number' ? page.rotation_restriction : 0
           }
           payload.delete_file = this.form.delete_file
+          payload.delete_restriction_file = this.form.delete_restriction_file
           await pageService.updatePage(this.pageId, payload)
         } else {
           await pageService.createPage(payload)
         }
 
         this.resetSelectedFileState()
+        this.resetSelectedRestrictionFileState()
         this.form.delete_file = false
+        this.form.delete_restriction_file = false
         this.captureInitialFormSnapshot()
 
         const redirectTarget = options.redirectTo || `/records/${this.recordId}/pages`
@@ -674,11 +898,24 @@ export default {
         this.form.rotation = 0
       }
     },
+    rotateRestrictionLeft() {
+      this.form.rotation_restriction = (this.form.rotation_restriction + 270) % 360
+      if (![0, 90, 180, 270].includes(this.form.rotation_restriction)) {
+        this.form.rotation_restriction = 0
+      }
+    },
+    rotateRestrictionRight() {
+      this.form.rotation_restriction = (this.form.rotation_restriction + 90) % 360
+      if (![0, 90, 180, 270].includes(this.form.rotation_restriction)) {
+        this.form.rotation_restriction = 0
+      }
+    },
   },
   // ...
   beforeUnmount() {
     window.removeEventListener('beforeunload', this.handleBeforeUnload)
     if (this.thumbnailUrl) URL.revokeObjectURL(this.thumbnailUrl)
+    this.revokePdfUrls()
   },
 }
 </script>
@@ -716,6 +953,13 @@ export default {
 }
 
 .page-navigation-status {
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.rotation-preview-label {
+  min-width: 180px;
+  text-align: center;
   font-size: 0.95rem;
   color: #555;
 }
@@ -836,6 +1080,52 @@ export default {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid #eee;
+}
+
+.pdf-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.pdf-preview-card {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.pdf-preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pdf-preview-header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.pdf-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pdf-preview-viewer {
+  min-height: 280px;
+  border: 1px solid #e0e0e0;
+  background: #fff;
+}
+
+.pdf-preview-placeholder {
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
 }
 
 .loading {

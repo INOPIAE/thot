@@ -179,6 +179,20 @@ def _build_safe_page_filename(page_name: str) -> str:
     return f"{safe_name}.pdf"
 
 
+def _build_restriction_filename(page: Page) -> str:
+    """Derive the restricted PDF filename from the current/origin file naming scheme."""
+    current_name = Path(page.current_file).name if page.current_file else ""
+    if current_name.lower().endswith("_current.pdf"):
+        return f"{current_name[:-12]}_restricted.pdf"
+
+    origin_name = Path(page.orgin_file).name if page.orgin_file else ""
+    if origin_name.lower().endswith(".pdf"):
+        return f"{Path(origin_name).stem}_restricted.pdf"
+
+    safe_name = _build_safe_page_filename(page.name)
+    return f"{Path(safe_name).stem}_restricted.pdf"
+
+
 def _save_pdf_content(
     pdf_content: bytes,
     record_signature: Optional[str],
@@ -284,6 +298,7 @@ def _serialize_page(page) -> dict:
         "workstatus_id": str(page.workstatus_id) if page.workstatus_id else None,
         "created_on": page.created_on.isoformat() if page.created_on else None,
         "rotation": page.rotation,
+        "rotation_restriction": page.rotation_restriction,
     }
 
 
@@ -309,6 +324,45 @@ def delete_uploaded_file(location_file: str) -> None:
 def _get_preferred_pdf_file(page: Page) -> Optional[str]:
     """Use searchable current_file when available, fallback to orgin_file."""
     return page.current_file or page.location_file
+
+
+def _get_gallery_pdf_file(page: Page, prefer_restriction: bool = False) -> Optional[str]:
+    """Return the PDF path variant requested by gallery consumers."""
+    if prefer_restriction and page.restriction_file:
+        return page.restriction_file
+    return _get_preferred_pdf_file(page)
+
+
+def _user_can_access_page_edit_files(current_user) -> bool:
+    """Return True when the user may access page edit file previews/downloads."""
+    return (
+        current_user.has_role("admin")
+        or current_user.has_role("user_page")
+        or current_user.has_role("user_scan")
+    )
+
+
+def _create_watermarked_pdf_bytes(page: Page, source_pdf_path: Path, current_user) -> bytes:
+    """Generate a watermarked PDF response payload for page-bound files."""
+    restriction_message = ""
+    if page.record and page.record.restriction_id and page.record.restriction_id != uuid.UUID("00000000-0000-0000-0000-000000000001"):
+        restriction_message = "Restricted"
+
+    from app.services.pdf_watermark_service import create_watermarked_pdf
+    from app.utils.public_links import build_record_public_url_pdf
+
+    return create_watermarked_pdf(
+        source_pdf=source_pdf_path,
+        username=current_user.username,
+        downloaded_at=datetime.now(),
+        record_name=page.record.title if page.record else None,
+        record_signature=page.record.signature if page.record else None,
+        record_pdf_url=build_record_public_url_pdf(page.record.id) if page.record else None,
+        page_text=page.name,
+        watermark_image_path=config.get_watermark_image_path(),
+        watermark_copyright=config.WATERMARK_COPYRIGHT,
+        restriction_message=restriction_message,
+    )
 
 
 def _get_ocr_status(page: Page) -> str:
@@ -910,11 +964,102 @@ async def view_watermarked_pdf(
     )
 
 
+@router.get("/{page_id}/download-restriction-pdf")
+async def download_restriction_pdf(
+    page_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """Download the restriction PDF with the standard watermark applied."""
+    csrf_cookie = request.cookies.get("csrf_token")
+    csrf_header = request.headers.get(CSRF_HEADER_NAME)
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        raise HTTPException(status_code=403, detail="CSRF token missing or invalid")
+    if not _user_can_access_page_edit_files(current_user):
+        raise HTTPException(status_code=403, detail="Not authorized to access restriction files")
+
+    page_uuid = _parse_uuid(page_id, "page_id")
+    page = db.query(Page).options(joinedload(Page.record)).filter(Page.id == page_uuid, Page.active == True).first()
+    if not page:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+    if not page.restriction_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No restriction PDF file available for this page")
+
+    source_pdf_path = (config.UPLOAD_DIRECTORY / page.restriction_file).resolve()
+    if not source_pdf_path.exists() or not source_pdf_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restriction PDF file not found on server")
+
+    try:
+        watermark_bytes = _create_watermarked_pdf_bytes(page, source_pdf_path, current_user)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate restriction PDF: {str(exc)}",
+        )
+
+    download_name = Path(page.restriction_file).name
+    return Response(
+        content=watermark_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{download_name}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/{page_id}/view-restriction-pdf")
+async def view_restriction_pdf(
+    page_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user),
+):
+    """View the restriction PDF inline with the standard watermark applied."""
+    csrf_cookie = request.cookies.get("csrf_token")
+    csrf_header = request.headers.get(CSRF_HEADER_NAME)
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        raise HTTPException(status_code=403, detail="CSRF token missing or invalid")
+    if not _user_can_access_page_edit_files(current_user):
+        raise HTTPException(status_code=403, detail="Not authorized to access restriction files")
+
+    page_uuid = _parse_uuid(page_id, "page_id")
+    page = db.query(Page).options(joinedload(Page.record)).filter(Page.id == page_uuid, Page.active == True).first()
+    if not page:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
+    if not page.restriction_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No restriction PDF file available for this page")
+
+    source_pdf_path = (config.UPLOAD_DIRECTORY / page.restriction_file).resolve()
+    if not source_pdf_path.exists() or not source_pdf_path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restriction PDF file not found on server")
+
+    try:
+        watermark_bytes = _create_watermarked_pdf_bytes(page, source_pdf_path, current_user)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate restriction PDF: {str(exc)}",
+        )
+
+    view_name = Path(page.restriction_file).name
+    return Response(
+        content=watermark_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{view_name}"',
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+    )
+
+
 @router.get("/{page_id}/thumbnail")
 async def get_thumbnail_with_watermark(
     page_id: str,
     request: Request,
     width: int = Query(200, ge=50, le=800, description="Thumbnail width in pixels"),
+    prefer_restriction: bool = Query(False, description="Use restriction PDF when present"),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
@@ -924,7 +1069,8 @@ async def get_thumbnail_with_watermark(
     if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
         raise HTTPException(status_code=403, detail="CSRF token missing or invalid")
     """Return a thumbnail of the first page with watermark overlay."""
-    page = db.query(Page).options(joinedload(Page.record)).filter(Page.id == page_id, Page.active == True).first()
+    page_uuid = _parse_uuid(page_id, "page_id")
+    page = db.query(Page).options(joinedload(Page.record)).filter(Page.id == page_uuid, Page.active == True).first()
 
     if not page:
         raise HTTPException(
@@ -932,7 +1078,7 @@ async def get_thumbnail_with_watermark(
             detail="Page not found",
         )
 
-    pdf_file = _get_preferred_pdf_file(page)
+    pdf_file = _get_gallery_pdf_file(page, prefer_restriction=prefer_restriction)
     if not pdf_file:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -1041,6 +1187,7 @@ async def list_pages(
                 "order_by": page.order_by,
                 "pdf_public_url": build_record_public_url_pdf(page.record_id) if page.record_id else None,
                 "rotation": page.rotation,
+                "rotation_restriction": page.rotation_restriction,
             }
             for page in pages
         ],
@@ -1095,6 +1242,7 @@ async def get_page(
         "last_modified_by": str(page.last_modified_by) if page.last_modified_by else None,
         "order_by": page.order_by,
         "rotation": page.rotation,
+        "rotation_restriction": page.rotation_restriction,
     }
 
 
@@ -1110,6 +1258,7 @@ async def create_page(
     workstatus_id: Optional[str] = Form(None),
     order_by: Optional[int] = Form(None),
     rotation: Optional[int] = Form(0),
+    rotation_restriction: Optional[int] = Form(0),
     file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
@@ -1208,6 +1357,7 @@ async def create_page(
                                 location_file=rel_path,
                                 workstatus_id=workstatus_uuid,
                                 order_by=this_order,
+                                rotation_restriction=rotation_restriction,
                             )
                             db.flush()
                             db.refresh(new_page)
@@ -1286,6 +1436,8 @@ async def create_page(
                         "last_modified_on": p.last_modified_on.isoformat() if p.last_modified_on else None,
                         "last_modified_by": str(p.last_modified_by) if p.last_modified_by else None,
                         "order_by": p.order_by,
+                        "rotation": p.rotation,
+                        "rotation_restriction": p.rotation_restriction,
                         "ocr_status": "pending",
                     })
                 return {
@@ -1344,6 +1496,7 @@ async def create_page(
         workstatus_id=workstatus_uuid,
         order_by=order_by,
         rotation=rotation,
+        rotation_restriction=rotation_restriction,
     )
     db.commit()
     db.refresh(new_page)
@@ -1381,6 +1534,7 @@ async def create_page(
         "last_modified_by": str(new_page.last_modified_by) if new_page.last_modified_by else None,
         "order_by": new_page.order_by,
         "rotation": new_page.rotation,
+        "rotation_restriction": new_page.rotation_restriction,
         "ocr_status": "pending",
         "split_pdf": split_pdf,
         "created_count": created_count,
@@ -1389,6 +1543,7 @@ async def create_page(
 
 @router.put("/{page_id}")
 async def update_page(
+    request: Request,
     page_id: str,
     name: str = Form(...),
     description: Optional[str] = Form(None),
@@ -1398,8 +1553,11 @@ async def update_page(
     workstatus_id: Optional[str] = Form(None),
     order_by: Optional[int] = Form(None),
     rotation: Optional[int] = Form(0),
+    rotation_restriction: Optional[int] = Form(0),
     file: Optional[UploadFile] = File(None),
+    restriction_file: Optional[UploadFile] = File(None),
     delete_file: Optional[bool] = Form(False),
+    delete_restriction_file: Optional[bool] = Form(False),
     db: Session = Depends(get_db),
     current_user = Depends(get_current_user),
 ):
@@ -1407,6 +1565,11 @@ async def update_page(
     Update an existing page
     Only users with 'admin' or 'user_page' role can update pages
     """
+    csrf_cookie = request.cookies.get("csrf_token")
+    csrf_header = request.headers.get(CSRF_HEADER_NAME)
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        raise HTTPException(status_code=403, detail="CSRF token missing or invalid")
+
     can_edit_page = current_user.has_role("admin") or current_user.has_role("user_page")
     can_manage_file = current_user.has_role("admin") or current_user.has_role("user_scan")
 
@@ -1467,6 +1630,11 @@ async def update_page(
                 existing_page.rotation = int(rotation)
             except Exception:
                 pass
+        if rotation_restriction is not None:
+            try:
+                existing_page.rotation_restriction = int(rotation_restriction)
+            except Exception:
+                pass
     
     # Handle file deletion
     if delete_file and existing_page.location_file:
@@ -1480,6 +1648,15 @@ async def update_page(
         if existing_page.current_file:
             delete_uploaded_file(existing_page.current_file)
             existing_page.current_file = None
+
+    if delete_restriction_file and existing_page.restriction_file:
+        if not can_manage_file:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to remove restriction files."
+            )
+        delete_uploaded_file(existing_page.restriction_file)
+        existing_page.restriction_file = None
     
     # Handle file upload (replaces existing file)
     if file and file.filename:
@@ -1509,6 +1686,34 @@ async def update_page(
             storage_subdir="origin",
         )
         existing_page.location_file = location_file
+
+    if restriction_file and restriction_file.filename:
+        if not can_manage_file:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to upload restriction files."
+            )
+        validate_file(restriction_file)
+        restriction_pdf_content = restriction_file.file.read()
+        if len(restriction_pdf_content) > config.MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"File too large. Maximum size: {config.MAX_UPLOAD_SIZE / (1024*1024)}MB"
+            )
+        _check_single_page_pdf(restriction_pdf_content)
+
+        if existing_page.restriction_file:
+            delete_uploaded_file(existing_page.restriction_file)
+
+        restriction_filename = _build_restriction_filename(existing_page)
+        existing_page.restriction_file = _save_pdf_content(
+            restriction_pdf_content,
+            existing_page.record.signature if existing_page.record else None,
+            str(existing_page.record_id),
+            restriction_filename,
+            storage_subdir="restriction",
+        )
+
     db.commit()
     if file and file.filename:
         db.refresh(existing_page)
@@ -1526,6 +1731,7 @@ async def update_page(
         "location_file": existing_page.location_file,
         "current_file": existing_page.current_file,
         "rotation": existing_page.rotation,
+        "rotation_restriction": existing_page.rotation_restriction,
         "ocr_status": _get_ocr_status(existing_page),
         "restriction_file": existing_page.restriction_file,
         "restriction_id": str(existing_page.restriction_id),

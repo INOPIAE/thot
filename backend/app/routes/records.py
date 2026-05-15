@@ -38,6 +38,11 @@ from app.utils.phonetics import generate_phonetic_codes
 from config import config
 from typing import Optional, List
 
+
+def _get_combined_pdf_source(page: Page) -> Optional[str]:
+    """Prefer restriction PDFs in gallery-style combined downloads when available."""
+    return page.restriction_file or page.current_file or page.location_file
+
 router = APIRouter(
     prefix="/records",
     tags=["records"],
@@ -475,9 +480,13 @@ async def download_combined_pdf(
         db.query(Page)
         .options(joinedload(Page.record))
         .filter(
-            Page.record_id == record_id,
+            Page.record_id == parsed_record_id,
             Page.active == True,
-            Page.location_file.isnot(None)
+            or_(
+                Page.restriction_file.isnot(None),
+                Page.current_file.isnot(None),
+                Page.location_file.isnot(None),
+            )
         )
         .order_by(Page.order_by.asc().nulls_last(), Page.name.asc())
         .all()
@@ -499,7 +508,11 @@ async def download_combined_pdf(
         
         # Process each page
         for page in pages:
-            source_pdf_path = (config.UPLOAD_DIRECTORY / page.location_file).resolve()
+            source_pdf = _get_combined_pdf_source(page)
+            if not source_pdf:
+                continue
+
+            source_pdf_path = (config.UPLOAD_DIRECTORY / source_pdf).resolve()
             
             if not source_pdf_path.exists() or not source_pdf_path.is_file():
                 # Skip pages where PDF file is missing

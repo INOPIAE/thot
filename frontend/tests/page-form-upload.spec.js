@@ -34,6 +34,8 @@ vi.mock('@/services/page', () => ({
     createPage: vi.fn().mockResolvedValue({}),
     updatePage: vi.fn().mockResolvedValue({}),
     getThumbnail: vi.fn().mockResolvedValue(new Blob(['thumbnail'], { type: 'image/png' })),
+    getViewPdf: vi.fn().mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' })),
+    getRestrictionViewPdf: vi.fn().mockResolvedValue(new Blob(['pdf'], { type: 'application/pdf' })),
   },
 }))
 
@@ -70,7 +72,9 @@ const messages = {
       uploadFile: 'Upload PDF File',
       uploadMultiPageHint: 'Multi-page PDFs will be split into individual page entries automatically.',
       uploadSinglePageOnly: 'Only single-page PDFs are allowed when replacing a file on an existing page.',
+      restrictionUploadSinglePageOnly: 'Restriction files must always be uploaded as a single-page PDF.',
       uploadSinglePageError: 'The selected PDF has multiple pages. Please upload a single-page PDF.',
+      restrictionRotation: 'Restriction rotation',
       previousPage: 'Previous page',
       nextPage: 'Next page',
       pageNavigationPosition: 'Page {current} of {total}',
@@ -79,9 +83,18 @@ const messages = {
       saveAndContinue: 'Save and continue',
       discardChanges: 'Discard changes',
       noFileSelected: 'No file selected',
+      noRestrictionFileSelected: 'No restriction file selected',
       noThumbnail: 'No thumbnail',
+      pdfThumbnail: 'PDF thumbnail',
       currentFile: 'Current file',
       removeCurrentFile: 'Remove current file',
+      restrictionFile: 'Restriction file',
+      removeRestrictionFile: 'Remove restriction file',
+      uploadRestrictionFile: 'Upload restriction PDF',
+      restrictionPdfDocument: 'Restriction PDF',
+      currentPdfDocument: 'Current PDF',
+      downloadCurrentPdf: 'Download current PDF',
+      downloadRestrictionPdf: 'Download restriction PDF',
       loadError: 'Failed to load page',
       metadataLoadError: 'Failed to load metadata',
       saveError: 'Failed to save page',
@@ -145,6 +158,7 @@ function mountPageForm({ isEditMode = false, roles = ['admin'] } = {}) {
       },
       stubs: {
         RouterLink: { template: '<a><slot /></a>' },
+        PdfJsPageViewer: { template: '<div class="pdfjs-page-viewer-stub" />' },
       },
     },
   })
@@ -295,6 +309,58 @@ describe('PageForm – file page count validation in edit mode', () => {
     expect(readSpy).not.toHaveBeenCalled()
     expect(wrapper.vm.filePageError).toBeNull()
     expect(wrapper.vm.selectedFile).toBeTruthy()
+  })
+})
+
+describe('PageForm – restriction file controls', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    global.URL.createObjectURL = vi.fn(() => 'blob:preview')
+    global.URL.revokeObjectURL = vi.fn()
+  })
+
+  it('rotates and deletes an existing restriction file before submit', async () => {
+    pageService.getPage.mockResolvedValueOnce({
+      name: 'Restricted Page',
+      description: '',
+      page: '',
+      comment: '',
+      restriction_id: 'r1',
+      workstatus_id: null,
+      location_file: 'some/file.pdf',
+      current_file: 'some/current.pdf',
+      restriction_file: 'some/restriction.pdf',
+      rotation: 0,
+      rotation_restriction: 90,
+      record_title: 'Record Title',
+      record_signature: 'REC-1',
+      order_by: 1,
+    })
+
+    const { wrapper } = mountPageForm({ isEditMode: true })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Remove restriction file')
+    expect(wrapper.text()).toContain('Restriction rotation: 90°')
+
+    const restrictionRotationButtons = wrapper.findAll('.restriction-rotation-group button')
+    await restrictionRotationButtons[1].trigger('click')
+
+    const restrictionDeleteLabel = wrapper
+      .findAll('label.checkbox-label')
+      .find((label) => label.text().includes('Remove restriction file'))
+
+    await restrictionDeleteLabel.find('input').setValue(true)
+    await wrapper.find('form.page-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(pageService.updatePage).toHaveBeenCalledWith(
+      'p-1',
+      expect.objectContaining({
+        rotation_restriction: 180,
+        delete_restriction_file: true,
+      }),
+    )
   })
 })
 
