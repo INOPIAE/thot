@@ -37,6 +37,9 @@ describe('RecordList.vue role-based columns', () => {
     const wrapper = mount(RecordList, {
       global: {
         plugins: [pinia, createI18nInstance()],
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         mocks: {
           $t: (msg, vars) => (vars ? `${msg} ${JSON.stringify(vars)}` : msg),
         },

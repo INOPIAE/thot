@@ -10,7 +10,14 @@ vi.mock('@/services/user', () => ({
   }
 }))
 
+vi.mock('@/services/role', () => ({
+  roleService: {
+    listRoles: vi.fn(() => Promise.resolve({ items: [] })),
+  },
+}))
+
 import { userService } from '@/services/user'
+import { roleService } from '@/services/role'
 
 const defaultProps = {
   userId: '1',
@@ -27,6 +34,12 @@ describe('UserRoleManagement.vue', () => {
     userService.getUserRoles.mockResolvedValue([])
     userService.getUserDetail.mockResolvedValue({ otp_enabled: false })
     userService.assignRoleToUser.mockResolvedValue({})
+    roleService.listRoles.mockResolvedValue({
+      items: [
+        { id: '2', name: 'support', active: true },
+        { id: '3', name: 'admin', active: true },
+      ],
+    })
     const wrapper = mount(UserRoleManagement, {
       props: defaultProps,
       global: {
@@ -54,6 +67,12 @@ describe('UserRoleManagement.vue', () => {
     userService.getUserRoles.mockResolvedValue([])
     userService.getUserDetail.mockResolvedValue({ otp_enabled: true })
     userService.assignRoleToUser.mockResolvedValue({})
+    roleService.listRoles.mockResolvedValue({
+      items: [
+        { id: '2', name: 'support', active: true },
+        { id: '3', name: 'admin', active: true },
+      ],
+    })
     const wrapper = mount(UserRoleManagement, {
       props: defaultProps,
       global: {
@@ -81,6 +100,11 @@ describe('UserRoleManagement.vue', () => {
     userService.getUserRoles.mockResolvedValue([])
     userService.getUserDetail.mockResolvedValue({ otp_enabled: false })
     userService.assignRoleToUser.mockResolvedValue({})
+    roleService.listRoles.mockResolvedValue({
+      items: [
+        { id: '4', name: 'user', active: true },
+      ],
+    })
     const wrapper = mount(UserRoleManagement, {
       props: defaultProps,
       global: {
@@ -110,6 +134,11 @@ describe('UserRoleManagement.vue', () => {
     ])
     userService.getUserDetail.mockResolvedValue({ otp_enabled: true })
     userService.assignRoleToUser.mockResolvedValue({})
+    roleService.listRoles.mockResolvedValue({
+      items: [
+        { id: '2', name: 'support', active: true },
+      ],
+    })
     const wrapper = mount(UserRoleManagement, {
       props: defaultProps,
       global: {

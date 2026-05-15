@@ -31,35 +31,31 @@ vi.mock('../src/services/page', () => ({
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
-import { createRouter, createWebHistory } from 'vue-router'
 import { pageService } from '../src/services/page'
 import PageViewer from '@/views/records/PageViewer.vue'
+import { messages } from '../src/locales/messages'
 
 describe('PageViewer.vue', () => {
   // Setup Pinia, i18n und Router für alle Tests
   const pinia = createPinia()
   setActivePinia(pinia)
-  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: {} } })
-  const router = createRouter({
-    history: createWebHistory(),
-    routes: []
-  })
+  const i18n = createI18n({ legacy: false, locale: 'en', fallbackLocale: 'en', messages })
 
   it('zeigt Fallback wenn keine Datei vorhanden', async () => {
     pageService.getPage.mockResolvedValue({ name: 'Test', location_file: null })
     const wrapper = mount(PageViewer, {
       global: {
-        plugins: [pinia, i18n, router],
-        stubs: ['router-link'],
+        plugins: [pinia, i18n],
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         mocks: {
-          $t: (msg) => msg === 'pages.pdfViewerTest' ? 'No PDF available' : msg,
-          $route: { params: { id: '1' } }
+          $route: { params: { recordId: 'r1', pageId: '1' } }
         }
       }
     })
     await flushPromises()
-    // expect(wrapper.text()).toContain('No PDF available')
-    expect(wrapper.text()).toContain('pages.pdfViewerTest')
+    expect(wrapper.text()).toContain('No PDF available for this page')
     expect(wrapper.find('.mock-pdf-viewer').exists()).toBe(false)
   })
 
@@ -69,11 +65,12 @@ describe('PageViewer.vue', () => {
     pageService.getThumbnail.mockResolvedValue(new Blob(['thumb'], { type: 'image/png' }))
     const wrapper = mount(PageViewer, {
       global: {
-        plugins: [pinia, i18n, router],
-        stubs: ['router-link'],
+        plugins: [pinia, i18n],
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         mocks: {
-          $t: (msg) => msg,
-          $route: { params: { id: '1' } }
+          $route: { params: { recordId: 'r1', pageId: '1' } }
         }
       }
     })

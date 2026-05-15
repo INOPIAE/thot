@@ -227,6 +227,13 @@ export default {
     pdfViewerUrl() {
       return this.pdfBlobUrl
     },
+    rotationStyle() {
+      const rotation = this.page?.rotation
+      if (typeof rotation !== 'number' || rotation === 0) {
+        return ''
+      }
+      return `transform: rotate(${rotation}deg);`
+    },
     canEditPage() {
       return this.authStore.hasRole('admin') || this.authStore.hasRole('user_page')
     },

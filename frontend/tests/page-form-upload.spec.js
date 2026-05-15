@@ -42,6 +42,7 @@ const messages = {
     pages: {
       createPage: 'Create Page',
       editPage: 'Edit Page',
+      rotation: 'Rotation',
       pageName: 'Name',
       pageNamePlaceholder: 'Enter name',
       description: 'Description',
@@ -50,6 +51,9 @@ const messages = {
       commentPlaceholder: 'Enter comment',
       pageContent: 'Content',
       pageContentPlaceholder: 'Enter content',
+      orderBy: 'Sort Order',
+      orderByPlaceholder: 'Sort order',
+      orderByHelp: 'Lower values are shown first.',
       restriction: 'Restriction',
       selectRestriction: 'Select restriction...',
       workstatus: 'Work Status',
@@ -59,11 +63,15 @@ const messages = {
       uploadSinglePageOnly: 'Only single-page PDFs are allowed when replacing a file on an existing page.',
       uploadSinglePageError: 'The selected PDF has multiple pages. Please upload a single-page PDF.',
       noFileSelected: 'No file selected',
+      noThumbnail: 'No thumbnail',
       currentFile: 'Current file',
       removeCurrentFile: 'Remove current file',
       loadError: 'Failed to load page',
       metadataLoadError: 'Failed to load metadata',
       saveError: 'Failed to save page',
+    },
+    records: {
+      title: 'Record',
     },
     messages: {
       unauthorised: 'Unauthorised',

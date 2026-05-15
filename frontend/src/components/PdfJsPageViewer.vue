@@ -24,13 +24,13 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
 export default {
   name: 'PdfJsPageViewer',
   props: {
-    src: { type: [String, Blob, ArrayBuffer], required: true },
+    src: { type: [String, Blob, ArrayBuffer], required: false, default: null },
     rotation: { type: Number, default: 0 }
   },
   setup(props) {
     let pdfDoc = null
     const pageNum = ref(1)
-    const numPages = ref(1)
+    const numPages = ref(0)
     const pdfCanvas = ref(null)
     let loadId = 0
 
@@ -57,6 +57,9 @@ export default {
       try {
         const viewport = page.getViewport({ scale: 1, rotation: props.rotation })
         const context = canvas.getContext('2d')
+        if (!context) {
+          return
+        }
         canvas.width = viewport.width
         canvas.height = viewport.height
         context.clearRect(0, 0, canvas.width, canvas.height)
@@ -78,7 +81,7 @@ export default {
     const loadPdf = async () => {
       try {
         if (!props.src) {
-          console.log('loadPdf: no src', props.src)
+          numPages.value = 0
           return
         }
         loadId++

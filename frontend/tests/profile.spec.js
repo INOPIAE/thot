@@ -46,6 +46,9 @@ const messages = {
     user: {
       profile: 'User Profile',
       changePassword: 'Change Password',
+      deleteAccount: 'Delete account',
+      deleteAccountDesc: 'Delete your account permanently.',
+      deleteAccountBtn: 'Delete account now',
       currentPassword: 'Current Password',
       newPassword: 'New Password',
       confirmNewPassword: 'Confirm New Password',
@@ -65,6 +68,13 @@ const messages = {
     },
     admin: {
       approveCorporate: 'Approved Membership Number',
+    },
+    emailChange: {
+      title: 'Change email address',
+      newEmail: 'New email address',
+      requestButton: 'Request email change',
+      info: 'We will send a confirmation link to the new address.',
+      checkInboxInfo: 'Please check your inbox to confirm the change.',
     },
     messages: {
       loadingError: 'Error loading data',
@@ -111,7 +121,9 @@ function mountProfile() {
   return mount(Profile, {
     global: {
       plugins: [i18n],
-      stubs: ['router-link'],
+      stubs: {
+        RouterLink: { template: '<a><slot /></a>' },
+      },
       mocks: {
         $router: { push: vi.fn() },
         $route: { path: '/user/profile' },
@@ -124,6 +136,7 @@ describe('Profile.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   it('renders profile component', () => {
@@ -152,7 +165,9 @@ describe('Profile.vue', () => {
     mount(Profile, {
       global: {
         plugins: [i18n],
-        stubs: ['router-link'],
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         mocks: {
           $router: { push: mockPush },
           $route: { path: '/user/profile' },

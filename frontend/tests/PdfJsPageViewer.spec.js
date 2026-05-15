@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import PdfJsPageViewer from '@/components/PdfJsPageViewer.vue'
 
+HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
+  clearRect: vi.fn(),
+}))
+
 // Mock pdfjs-dist
 vi.mock('pdfjs-dist/build/pdf', () => ({
   GlobalWorkerOptions: { workerSrc: '' },
@@ -18,11 +22,8 @@ vi.mock('pdfjs-dist/build/pdf', () => ({
 
 describe('PdfJsPageViewer', () => {
   it('renders fallback if no src', async () => {
-    const wrapper = mount(PdfJsPageViewer, {
-      props: { src: null }
-    })
-    // The default fallback is only shown if numPages <= 0, otherwise shows <1 / 1>
-    expect(wrapper.text()).toMatch(/No PDF loaded|<1 \/ 1>/)
+    const wrapper = mount(PdfJsPageViewer)
+    expect(wrapper.text()).toContain('No PDF loaded')
   })
 
   it('renders canvas if src is provided', async () => {

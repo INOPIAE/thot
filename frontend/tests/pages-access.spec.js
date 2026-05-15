@@ -1,5 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+
+vi.mock('@/components/PdfJsPageViewer.vue', () => ({
+  default: {
+    name: 'PdfJsPageViewer',
+    template: '<div />',
+  },
+}))
+
 import router from '@/router'
 import { useAuthStore } from '@/stores/auth'
 

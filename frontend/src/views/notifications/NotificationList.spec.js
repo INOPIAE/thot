@@ -23,6 +23,9 @@ describe('NotificationList.vue', () => {
     })
     const wrapper = mount(NotificationList, {
       global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         mocks: {
           $t: (msg) => msg,
           $d: (date) => date.toISOString(),
@@ -47,6 +50,9 @@ describe('NotificationList.vue', () => {
     notificationService.getUserNotifications.mockResolvedValue({ data: [] })
     const wrapper = mount(NotificationList, {
       global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         mocks: {
           $t: (msg) => msg,
           $d: (date) => date.toISOString(),
@@ -62,6 +68,9 @@ describe('NotificationList.vue', () => {
     notificationService.getUserNotifications.mockRejectedValue(new Error('fail'))
     const wrapper = mount(NotificationList, {
       global: {
+        stubs: {
+          RouterLink: { template: '<a><slot /></a>' },
+        },
         mocks: {
           $t: (msg) => msg,
           $d: (date) => date.toISOString(),
