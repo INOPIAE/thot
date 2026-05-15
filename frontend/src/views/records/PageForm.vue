@@ -1,7 +1,30 @@
 <template>
   <div class="page-form-container">
     <div class="form-header">
-      <h1>{{ isEditMode ? $t('pages.editPage') : $t('pages.createPage') }}</h1>
+      <div class="form-header-main">
+        <h1>{{ isEditMode ? $t('pages.editPage') : $t('pages.createPage') }}</h1>
+        <div v-if="isEditMode && pageSequence.length > 0" class="page-navigation-toolbar">
+          <button
+            type="button"
+            class="btn btn-light"
+            :disabled="!hasPreviousPage || submitting || loading"
+            @click="navigateToAdjacentPage(-1)"
+          >
+            {{ $t('pages.previousPage') }}
+          </button>
+          <span class="page-navigation-status">
+            {{ $t('pages.pageNavigationPosition', { current: currentPagePosition, total: pageSequence.length }) }}
+          </span>
+          <button
+            type="button"
+            class="btn btn-light"
+            :disabled="!hasNextPage || submitting || loading"
+            @click="navigateToAdjacentPage(1)"
+          >
+            {{ $t('pages.nextPage') }}
+          </button>
+        </div>
+      </div>
       <router-link :to="`/records/${recordId}/pages`" class="btn btn-secondary">
         {{ $t('common.back') }}
       </router-link>
@@ -158,7 +181,54 @@
           {{ $t('common.cancel') }}
         </router-link>
       </div>
+
+      <div v-if="isEditMode && pageSequence.length > 0" class="page-navigation-toolbar page-navigation-toolbar-bottom">
+        <button
+          type="button"
+          class="btn btn-light"
+          :disabled="!hasPreviousPage || submitting || loading"
+          @click="navigateToAdjacentPage(-1)"
+        >
+          {{ $t('pages.previousPage') }}
+        </button>
+        <span class="page-navigation-status">
+          {{ $t('pages.pageNavigationPosition', { current: currentPagePosition, total: pageSequence.length }) }}
+        </span>
+        <button
+          type="button"
+          class="btn btn-light"
+          :disabled="!hasNextPage || submitting || loading"
+          @click="navigateToAdjacentPage(1)"
+        >
+          {{ $t('pages.nextPage') }}
+        </button>
+      </div>
     </form>
+
+    <div v-if="showUnsavedChangesDialog" class="modal-overlay" @click.self="closeUnsavedChangesDialog">
+      <div class="modal-dialog unsaved-changes-dialog" role="dialog" :aria-label="$t('pages.unsavedChangesTitle')">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title">{{ $t('pages.unsavedChangesTitle') }}</h2>
+            <button type="button" class="btn-close" :disabled="submitting" @click="closeUnsavedChangesDialog">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p>{{ $t('pages.unsavedChangesMessage') }}</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" :disabled="submitting" @click="closeUnsavedChangesDialog">
+              {{ $t('common.cancel') }}
+            </button>
+            <button type="button" class="btn btn-danger" :disabled="submitting" @click="discardPendingNavigation">
+              {{ $t('pages.discardChanges') }}
+            </button>
+            <button type="button" class="btn btn-primary" :disabled="submitting" @click="saveAndContinueNavigation">
+              {{ submitting ? $t('common.saving') : $t('pages.saveAndContinue') }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -171,6 +241,22 @@ import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'PageForm',
+  beforeRouteLeave(to, from, next) {
+    if (this.shouldBlockNavigation(to.fullPath)) {
+      this.openUnsavedChangesDialog(to.fullPath)
+      next(false)
+      return
+    }
+    next()
+  },
+  beforeRouteUpdate(to, from, next) {
+    if (this.shouldBlockNavigation(to.fullPath)) {
+      this.openUnsavedChangesDialog(to.fullPath)
+      next(false)
+      return
+    }
+    next()
+  },
   data() {
     return {
       authStore: useAuthStore(),
@@ -185,6 +271,11 @@ export default {
       hasCurrentFile: false,
       pageRecordTitle: '',
       pageRecordSignature: '',
+      pageSequence: [],
+      initialFormSnapshot: null,
+      showUnsavedChangesDialog: false,
+      pendingNavigationTarget: null,
+      bypassUnsavedChangesGuard: false,
       form: {
         name: '',
         description: '',
@@ -209,6 +300,18 @@ export default {
     pageId() {
       return this.$route.params.pageId
     },
+    currentPageIndex() {
+      return this.pageSequence.findIndex((page) => page.id === this.pageId)
+    },
+    currentPagePosition() {
+      return this.currentPageIndex >= 0 ? this.currentPageIndex + 1 : null
+    },
+    hasPreviousPage() {
+      return this.currentPageIndex > 0
+    },
+    hasNextPage() {
+      return this.currentPageIndex >= 0 && this.currentPageIndex < this.pageSequence.length - 1
+    },
     canCreatePage() {
       return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
     },
@@ -224,21 +327,81 @@ export default {
     rotationStyle() {
       return this.form.rotation ? `transform: rotate(${this.form.rotation}deg);` : ''
     },
+    isDirty() {
+      if (!this.initialFormSnapshot) {
+        return false
+      }
+      return this.initialFormSnapshot !== JSON.stringify(this.buildFormSnapshot())
+    },
+  },
+  watch: {
+    pageId(newPageId, oldPageId) {
+      if (newPageId && newPageId !== oldPageId) {
+        this.handleRouteContextChange()
+      }
+    },
+    recordId(newRecordId, oldRecordId) {
+      if (newRecordId && newRecordId !== oldRecordId) {
+        this.handleRouteContextChange()
+      }
+    },
   },
   mounted() {
     if (!this.recordId) {
       this.error = this.$t('pages.loadError') + ': recordId missing in URL.'
       return
     }
+    window.addEventListener('beforeunload', this.handleBeforeUnload)
     this.loadMetadata()
-    if (this.isEditMode) {
-      this.loadPage()
-      // Im Edit-Modus KEIN loadRecordInfo(), da Infos aus Page kommen
-    } else {
-      this.loadRecordInfo()
-    }
+    this.handleRouteContextChange()
   },
   methods: {
+    buildFormSnapshot() {
+      return {
+        name: this.form.name,
+        description: this.form.description,
+        page: this.form.page,
+        comment: this.form.comment,
+        restriction_id: this.form.restriction_id,
+        workstatus_id: this.form.workstatus_id,
+        order_by: this.form.order_by !== undefined && this.form.order_by !== null ? this.form.order_by : null,
+        delete_file: !!this.form.delete_file,
+        rotation: this.form.rotation || 0,
+        selected_file: this.selectedFile
+          ? {
+              name: this.selectedFile.name,
+              size: this.selectedFile.size,
+              lastModified: this.selectedFile.lastModified,
+            }
+          : null,
+      }
+    },
+    captureInitialFormSnapshot() {
+      this.initialFormSnapshot = JSON.stringify(this.buildFormSnapshot())
+    },
+    resetSelectedFileState() {
+      this.selectedFile = null
+      this.selectedFileName = ''
+      this.filePageError = null
+    },
+    async handleRouteContextChange() {
+      if (!this.recordId) {
+        this.error = this.$t('pages.loadError') + ': recordId missing in URL.'
+        return
+      }
+
+      if (this.isEditMode) {
+        await Promise.all([this.loadPageSequence(), this.loadPage()])
+        return
+      }
+
+      this.pageSequence = []
+      this.resetSelectedFileState()
+      this.hasCurrentFile = false
+      this.form.delete_file = false
+      this.captureInitialFormSnapshot()
+      this.loadRecordInfo()
+    },
     async loadRecordInfo() {
       if (!this.recordId) {
         this.error = this.$t('pages.loadError') + ': recordId missing in URL.'
@@ -268,14 +431,58 @@ export default {
             this.form.restriction_id = noneRestriction.id
           }
         }
+
+        if (
+          !this.isEditMode &&
+          !this.form.name &&
+          !this.form.description &&
+          !this.form.page &&
+          !this.form.comment &&
+          !this.form.workstatus_id &&
+          this.form.order_by === null &&
+          !this.selectedFile &&
+          !this.form.delete_file
+        ) {
+          this.captureInitialFormSnapshot()
+        }
       } catch (err) {
         this.error = err.message || this.$t('pages.metadataLoadError')
+      }
+    },
+    async loadPageSequence() {
+      const limit = 100
+      let skip = 0
+      const orderedPages = []
+
+      try {
+        while (true) {
+          const response = await pageService.listPages({
+            record_id: this.recordId,
+            skip,
+            limit,
+          })
+
+          const items = response.items || []
+          orderedPages.push(...items.map((page) => ({ id: page.id, name: page.name })))
+
+          if (!items.length || orderedPages.length >= (response.total || 0)) {
+            break
+          }
+
+          skip += limit
+        }
+
+        this.pageSequence = orderedPages
+      } catch (err) {
+        this.error = err.message || this.$t('pages.loadError')
       }
     },
     async loadPage() {
       this.loading = true
       this.error = null
       try {
+        this.resetSelectedFileState()
+        this.form.delete_file = false
         const page = await pageService.getPage(this.pageId)
         this.form.name = page.name || ''
         this.form.description = page.description || ''
@@ -298,11 +505,75 @@ export default {
             this.thumbnailUrl = null
           }
         }
+        this.captureInitialFormSnapshot()
       } catch (err) {
         this.error = err.message || this.$t('pages.loadError')
       } finally {
         this.loading = false
       }
+    },
+    handleBeforeUnload(event) {
+      if (!this.isDirty) {
+        return
+      }
+      event.preventDefault()
+      event.returnValue = ''
+    },
+    shouldBlockNavigation(targetPath) {
+      return !!targetPath && !this.bypassUnsavedChangesGuard && this.isDirty && targetPath !== this.$route.fullPath
+    },
+    openUnsavedChangesDialog(targetPath) {
+      this.pendingNavigationTarget = targetPath
+      this.showUnsavedChangesDialog = true
+    },
+    closeUnsavedChangesDialog() {
+      this.showUnsavedChangesDialog = false
+      this.pendingNavigationTarget = null
+    },
+    async proceedWithPendingNavigation() {
+      if (!this.pendingNavigationTarget) {
+        return
+      }
+
+      const targetPath = this.pendingNavigationTarget
+      this.showUnsavedChangesDialog = false
+      this.pendingNavigationTarget = null
+      this.bypassUnsavedChangesGuard = true
+
+      try {
+        await this.$router.push(targetPath)
+      } finally {
+        this.$nextTick(() => {
+          this.bypassUnsavedChangesGuard = false
+        })
+      }
+    },
+    async discardPendingNavigation() {
+      await this.proceedWithPendingNavigation()
+    },
+    async saveAndContinueNavigation() {
+      if (!this.pendingNavigationTarget) {
+        this.closeUnsavedChangesDialog()
+        return
+      }
+
+      await this.handleSubmit({ redirectTo: this.pendingNavigationTarget })
+    },
+    async navigateToAdjacentPage(offset) {
+      const targetIndex = this.currentPageIndex + offset
+      const targetPage = this.pageSequence[targetIndex]
+
+      if (!targetPage) {
+        return
+      }
+
+      const targetPath = `/records/${this.recordId}/pages/${targetPage.id}/edit`
+      if (this.shouldBlockNavigation(targetPath)) {
+        this.openUnsavedChangesDialog(targetPath)
+        return
+      }
+
+      await this.$router.push(targetPath)
     },
     onFileChange(event) {
       const file = event.target.files?.[0]
@@ -332,7 +603,7 @@ export default {
         reader.readAsArrayBuffer(file)
       }
     },
-    async handleSubmit() {
+    async handleSubmit(options = {}) {
       if ((!this.isEditMode && !this.canCreatePage) || (this.isEditMode && !this.canEditPage && !this.canManageFile)) {
         this.error = this.$t('messages.unauthorised')
         return
@@ -376,7 +647,14 @@ export default {
           await pageService.createPage(payload)
         }
 
-        this.$router.push(`/records/${this.recordId}/pages`)
+        this.resetSelectedFileState()
+        this.form.delete_file = false
+        this.captureInitialFormSnapshot()
+
+        const redirectTarget = options.redirectTo || `/records/${this.recordId}/pages`
+        this.showUnsavedChangesDialog = false
+        this.pendingNavigationTarget = null
+        await this.$router.push(redirectTarget)
       } catch (err) {
         this.error = err.message || this.$t('pages.saveError')
       } finally {
@@ -399,6 +677,7 @@ export default {
   },
   // ...
   beforeUnmount() {
+    window.removeEventListener('beforeunload', this.handleBeforeUnload)
     if (this.thumbnailUrl) URL.revokeObjectURL(this.thumbnailUrl)
   },
 }
@@ -415,7 +694,90 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
   margin-bottom: 24px;
+}
+
+.form-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-navigation-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.page-navigation-toolbar-bottom {
+  margin-top: 16px;
+}
+
+.page-navigation-status {
+  font-size: 0.95rem;
+  color: #555;
+}
+
+.unsaved-changes-dialog {
+  max-width: 560px;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-dialog {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: min(560px, 90vw);
+}
+
+.modal-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #666;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
 }
 
 .page-form {
