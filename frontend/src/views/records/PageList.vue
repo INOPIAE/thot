@@ -75,9 +75,16 @@
     <!-- Pages List -->
     <div v-if="!loading && pages.length > 0" class="pages-list">
       <div class="pages-grid">
-        <div v-for="page in pages" :key="page.id" class="page-card">
+        <div v-for="(page, index) in pages" :key="page.id" class="page-card">
           <div class="page-card-header">
-            <h3>{{ page.name }}</h3>
+            <div class="page-card-heading">
+              <div>
+                <div v-if="canReorderPages" class="page-position">
+                  {{ $t('pages.currentPosition', { position: getPagePosition(page, index) }) }}
+                </div>
+                <h3>{{ page.name }}</h3>
+              </div>
+            </div>
           </div>
           <div class="page-card-body">
             <p v-if="page.description" class="page-description">
@@ -110,6 +117,51 @@
               <button v-if="canManageOcr()" class="btn btn-sm btn-warning ml-2" @click="startOcr(page.id)">
                 OCR starten
               </button>
+            </div>
+            <div v-if="canReorderPages" class="page-reorder-panel">
+              <div class="page-reorder-header">
+                <div>
+                  <div class="page-reorder-title">{{ $t('pages.reorderSectionTitle') }}</div>
+                  <small class="page-reorder-help">{{ $t('pages.reorderHelp') }}</small>
+                </div>
+                <div class="page-order-buttons">
+                  <button
+                    class="btn btn-sm btn-light"
+                    :disabled="isReordering(page.id) || getPagePosition(page, index) === 1"
+                    @click="movePageByOffset(page, index, -1)"
+                  >
+                    {{ $t('pages.moveUp') }}
+                  </button>
+                  <button
+                    class="btn btn-sm btn-light"
+                    :disabled="isReordering(page.id) || getPagePosition(page, index) === pageOrderTotal"
+                    @click="movePageByOffset(page, index, 1)"
+                  >
+                    {{ $t('pages.moveDown') }}
+                  </button>
+                </div>
+              </div>
+              <label :for="`move-target-${page.id}`" class="page-reorder-label">
+                {{ $t('pages.moveToPosition') }}
+              </label>
+              <div class="page-reorder-controls">
+                <input
+                  :id="`move-target-${page.id}`"
+                  v-model.number="moveTargets[page.id]"
+                  type="number"
+                  min="1"
+                  :max="pageOrderTotal"
+                  class="form-control page-reorder-input"
+                  :disabled="isReordering(page.id)"
+                />
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  :disabled="isReordering(page.id) || pageOrderTotal < 2"
+                  @click="movePageToTarget(page)"
+                >
+                  {{ $t('pages.moveToPositionAction') }}
+                </button>
+              </div>
             </div>
           </div>
           <div class="page-card-footer">
@@ -192,6 +244,10 @@ export default {
       currentPage: 1,
       pageSize: 10,
       total: 0,
+      pageOrderTotal: 0,
+      moveTargets: {},
+      pageOrderMap: {},
+      movingPageId: null,
     }
   },
   computed: {
@@ -202,6 +258,9 @@ export default {
       return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
     },
     canEditPage() {
+      return this.authStore.hasRole('admin') || this.authStore.hasRole('user_page')
+    },
+    canReorderPages() {
       return this.authStore.hasRole('admin') || this.authStore.hasRole('user_page')
     },
     canUploadExistingPage() {
@@ -254,6 +313,14 @@ export default {
         this.pages = response.items || []
         this.total = response.total || 0
 
+        if (this.canReorderPages && this.total > 0) {
+          await this.loadPageOrderState()
+        } else {
+          this.pageOrderTotal = 0
+          this.pageOrderMap = {}
+          this.moveTargets = {}
+        }
+
         if (this.total > 0 && this.currentPage > this.totalPages) {
           this.currentPage = this.totalPages
         }
@@ -276,6 +343,122 @@ export default {
       this.searchName = ''
       this.currentPage = 1
       this.loadPages()
+    },
+    getPagePosition(page, index) {
+      const mappedIndex = this.pageOrderMap[page.id]
+
+      if (typeof mappedIndex === 'number') {
+        return mappedIndex + 1
+      }
+
+      return ((this.currentPage - 1) * this.pageSize) + index + 1
+    },
+    isReordering(pageId) {
+      return this.movingPageId === pageId
+    },
+    async fetchOrderedPages() {
+      const initialLimit = Math.max(this.total || 0, this.pageSize, 1)
+      let response = await pageService.listPages({
+        record_id: this.recordId,
+        skip: 0,
+        limit: initialLimit,
+      })
+
+      const items = response.items || []
+      const responseTotal = response.total || items.length
+
+      if (responseTotal > items.length) {
+        response = await pageService.listPages({
+          record_id: this.recordId,
+          skip: 0,
+          limit: responseTotal,
+        })
+      }
+
+      return response.items || []
+    },
+    async loadPageOrderState() {
+      const orderedPages = await this.fetchOrderedPages()
+      const pageOrderMap = {}
+      const moveTargets = { ...this.moveTargets }
+
+      this.pageOrderTotal = orderedPages.length
+
+      orderedPages.forEach((page, index) => {
+        pageOrderMap[page.id] = index
+        moveTargets[page.id] = index + 1
+      })
+
+      this.pageOrderMap = pageOrderMap
+      this.moveTargets = moveTargets
+    },
+    getReorderError(err, fallback) {
+      return err?.message || err?.detail || fallback
+    },
+    async reorderPages(pageId, targetIndex) {
+      this.error = null
+      this.successMessage = ''
+      this.movingPageId = pageId
+
+      try {
+        const orderedPages = await this.fetchOrderedPages()
+        const currentIndex = orderedPages.findIndex((page) => page.id === pageId)
+
+        if (currentIndex === -1) {
+          throw new Error(this.$t('pages.reorderLoadError'))
+        }
+
+        const boundedTargetIndex = Math.min(Math.max(targetIndex, 0), orderedPages.length - 1)
+
+        if (boundedTargetIndex === currentIndex) {
+          return
+        }
+
+        const [pageToMove] = orderedPages.splice(currentIndex, 1)
+        orderedPages.splice(boundedTargetIndex, 0, pageToMove)
+
+        const changedPages = orderedPages
+          .map((page, index) => ({
+            ...page,
+            nextOrder: index + 1,
+          }))
+          .filter((page) => page.order_by !== page.nextOrder)
+
+        for (const page of changedPages) {
+          await pageService.updatePage(page.id, {
+            name: page.name,
+            description: page.description ?? '',
+            page: page.page ?? '',
+            comment: page.comment ?? '',
+            restriction_id: page.restriction_id,
+            workstatus_id: page.workstatus_id ?? '',
+            order_by: page.nextOrder,
+            rotation: page.rotation ?? 0,
+          })
+        }
+
+        this.successMessage = this.$t('pages.reorderSuccess')
+        await this.loadPages()
+      } catch (err) {
+        console.error('Error reordering pages:', err)
+        this.error = this.getReorderError(err, this.$t('pages.reorderError'))
+      } finally {
+        this.movingPageId = null
+      }
+    },
+    async movePageByOffset(page, index, offset) {
+      const currentPosition = this.getPagePosition(page, index)
+      await this.reorderPages(page.id, currentPosition - 1 + offset)
+    },
+    async movePageToTarget(page) {
+      const targetPosition = Number(this.moveTargets[page.id])
+
+      if (!Number.isInteger(targetPosition) || targetPosition < 1 || targetPosition > this.pageOrderTotal) {
+        this.error = this.$t('pages.invalidTargetPosition', { total: this.pageOrderTotal })
+        return
+      }
+
+      await this.reorderPages(page.id, targetPosition - 1)
     },
     async handleDelete(pageId) {
       if (!confirm(this.$t('pages.confirmDelete'))) {
@@ -416,9 +599,27 @@ export default {
   border-bottom: 1px solid #eee;
 }
 
+.page-card-heading {
+  display: flex;
+  align-items: flex-start;
+}
+
 .page-card-header h3 {
   margin: 0;
   word-break: break-word;
+}
+
+.page-position {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 0.35rem;
+}
+
+.page-order-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .page-actions {
@@ -431,6 +632,47 @@ export default {
 .page-card-body {
   padding: 1rem;
   flex: 1;
+}
+
+.page-reorder-panel {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
+
+.page-reorder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.page-reorder-title {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.page-reorder-label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.page-reorder-controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.page-reorder-input {
+  max-width: 7rem;
+}
+
+.page-reorder-help {
+  display: block;
+  margin-top: 0.5rem;
+  color: #666;
 }
 
 .page-description,
@@ -494,6 +736,22 @@ export default {
   padding: 1rem;
   margin-bottom: 1rem;
   border-radius: 4px;
+}
+
+@media (max-width: 768px) {
+  .page-reorder-header,
+  .page-reorder-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-order-buttons {
+    justify-content: flex-start;
+  }
+
+  .page-reorder-input {
+    max-width: none;
+  }
 }
 
 </style>
