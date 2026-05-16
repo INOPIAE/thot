@@ -1,5 +1,5 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import NotificationEdit from './NotificationEdit.vue'
+import NotificationEdit from '@/views/notifications/NotificationEdit.vue'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 vi.mock('@/services/notification', () => ({
@@ -40,7 +40,6 @@ describe('NotificationEdit.vue', () => {
       },
     })
     await flushPromises()
-    // Warte explizit auf notification und Input-Element (max. 20 Ticks)
     let input
     for (let i = 0; i < 20; i++) {
       if (wrapper.vm.notification) {
@@ -52,7 +51,7 @@ describe('NotificationEdit.vue', () => {
     expect(wrapper.vm.notification).toBeTruthy()
     expect(input && input.exists()).toBe(true)
     expect(input.element.value).toBe('EditTitle')
-    let textarea = wrapper.find('textarea#notification')
+    const textarea = wrapper.find('textarea#notification')
     expect(textarea.exists()).toBe(true)
     expect(textarea.element.value).toBe('EditBody')
   })
@@ -87,7 +86,6 @@ describe('NotificationEdit.vue', () => {
       },
     })
     await flushPromises()
-    // Warte explizit auf notification und Formular (max. 20 Ticks)
     let form
     for (let i = 0; i < 20; i++) {
       if (wrapper.vm.notification) {

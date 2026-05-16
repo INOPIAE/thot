@@ -1,6 +1,6 @@
 import { mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import PageList from './PageList.vue'
+import PageList from '@/views/records/PageList.vue'
 
 const mockRoute = {
   params: {

@@ -1,6 +1,5 @@
-
 import { mount } from '@vue/test-utils'
-import NotificationList from './NotificationList.vue'
+import NotificationList from '@/views/notifications/NotificationList.vue'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 vi.mock('@/services/notification', () => ({
@@ -33,12 +32,10 @@ describe('NotificationList.vue', () => {
         },
       },
     })
-    // Warte explizit auf das Laden der Notifications (max. 20 Ticks)
     for (let i = 0; i < 20; i++) {
       if (wrapper.vm.notifications && wrapper.vm.notifications.length > 0) break
       await wrapper.vm.$nextTick()
     }
-    // Warten, bis das Template nach dem Setzen von notifications neu gerendert wurde
     await wrapper.vm.$nextTick()
     expect(wrapper.vm.notifications.length).toBeGreaterThan(0)
     expect(wrapper.text()).toContain('Test')

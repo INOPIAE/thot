@@ -1,5 +1,5 @@
 import { mount, flushPromises } from '@vue/test-utils'
-import NotificationCreate from './NotificationCreate.vue'
+import NotificationCreate from '@/views/notifications/NotificationCreate.vue'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 vi.mock('@/services/notification', () => ({
@@ -29,21 +29,18 @@ describe('NotificationCreate.vue', () => {
       },
     })
     await flushPromises()
-    // Warte bis die Inputs existieren
     const input = wrapper.find('input#title')
     const textarea = wrapper.find('textarea#notification')
     const select = wrapper.find('select#role')
     expect(input.exists()).toBe(true)
     expect(textarea.exists()).toBe(true)
     expect(select.exists()).toBe(true)
-    // Setze die Formulardaten direkt im State
     wrapper.vm.form = { title: 'TestTitle', notification: 'TestBody', roles_id: '1' }
     await wrapper.vm.$nextTick()
     await flushPromises()
     expect(wrapper.vm.form).toEqual({ title: 'TestTitle', notification: 'TestBody', roles_id: '1' })
     await wrapper.vm.submitNotification()
     await flushPromises()
-    // Prüfe die tatsächlichen Aufrufdaten des Mocks
     const call = notificationService.createNotification.mock.calls[0][0]
     expect(call).toEqual({ title: 'TestTitle', notification: 'TestBody', roles_id: '1' })
     expect(wrapper.text()).toContain('notifications.success')
