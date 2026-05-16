@@ -1,0 +1,75 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 6,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 3,
+  "numPassedTests": 3,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "startTime": 1778909770772,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "RecordForm query routing"
+          ],
+          "fullName": " RecordForm query routing preserves records list query in header, cancel, and save navigation",
+          "status": "passed",
+          "title": "preserves records list query in header, cancel, and save navigation",
+          "duration": 802,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1778909780962,
+      "endTime": 1778909781764,
+      "status": "passed",
+      "message": "",
+      "name": "D:/Daten/programierung neu/nlf/db/frontend/tests/record-form-query.spec.js"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "RecordList query routing"
+          ],
+          "fullName": " RecordList query routing restores records list query and forwards it to record routes",
+          "status": "passed",
+          "title": "restores records list query and forwards it to record routes",
+          "duration": 296,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1778909780963,
+      "endTime": 1778909781259,
+      "status": "passed",
+      "message": "",
+      "name": "D:/Daten/programierung neu/nlf/db/frontend/tests/record-list-query.spec.js"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "RecordPagesGallery"
+          ],
+          "fullName": " RecordPagesGallery prefers the restriction PDF in gallery thumbnails, viewer, and download",
+          "status": "passed",
+          "title": "prefers the restriction PDF in gallery thumbnails, viewer, and download",
+          "duration": 494,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1778909781140,
+      "endTime": 1778909781634,
+      "status": "passed",
+      "message": "",
+      "name": "D:/Daten/programierung neu/nlf/db/frontend/tests/record-pages-gallery.spec.js"
+    }
+  ]
+}

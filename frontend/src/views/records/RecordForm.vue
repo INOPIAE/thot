@@ -6,13 +6,13 @@
         <button v-if="isEditMode" type="button" class="btn btn-info" @click="toggleQrCode" :disabled="qrLoading">
           {{ showQrCode ? $t('records.hideQrCode') : $t('records.showQrCode') }}
         </button>
-        <router-link v-if="isEditMode" :to="`/records/${recordId}/pages-gallery`" class="btn btn-primary">
+        <router-link v-if="isEditMode" :to="recordGalleryRoute" class="btn btn-primary">
           {{ $t('pages.galleryTitle') }}
         </router-link>
-        <router-link v-if="isEditMode" :to="`/records/${recordId}/pages`" class="btn btn-info">
+        <router-link v-if="isEditMode" :to="recordPagesRoute" class="btn btn-info">
           {{ $t('pages.managePages') }}
         </router-link>
-        <router-link to="/records" class="btn btn-secondary">
+        <router-link :to="recordListRoute" class="btn btn-secondary">
           {{ $t('common.back') }}
         </router-link>
       </div>
@@ -608,7 +608,7 @@
         <button v-if="canEditRecord" type="submit" class="btn btn-primary" :disabled="submitting">
           {{ submitting ? $t('common.saving') : $t('common.save') }}
         </button>
-        <router-link to="/records" class="btn btn-secondary">
+        <router-link :to="recordListRoute" class="btn btn-secondary">
           {{ canEditRecord ? $t('common.cancel') : $t('common.back') }}
         </router-link>
       </div>
@@ -704,6 +704,37 @@ export default defineComponent({
     },
     recordId() {
       return this.$route.params.id
+    },
+    recordsQuery() {
+      const query = {}
+      const routeQuery = this.$route.query || {}
+
+      if (typeof routeQuery.recordsPage === 'string' && routeQuery.recordsPage) query.recordsPage = routeQuery.recordsPage
+      if (typeof routeQuery.recordsPageSize === 'string' && routeQuery.recordsPageSize) query.recordsPageSize = routeQuery.recordsPageSize
+      if (typeof routeQuery.recordsTitle === 'string' && routeQuery.recordsTitle) query.recordsTitle = routeQuery.recordsTitle
+      if (typeof routeQuery.recordsSignature === 'string' && routeQuery.recordsSignature) query.recordsSignature = routeQuery.recordsSignature
+      if (typeof routeQuery.recordsKeywordsNames === 'string' && routeQuery.recordsKeywordsNames) query.recordsKeywordsNames = routeQuery.recordsKeywordsNames
+      if (typeof routeQuery.recordsKeywordsLocations === 'string' && routeQuery.recordsKeywordsLocations) query.recordsKeywordsLocations = routeQuery.recordsKeywordsLocations
+
+      return query
+    },
+    recordListRoute() {
+      return {
+        path: '/records',
+        query: this.recordsQuery,
+      }
+    },
+    recordGalleryRoute() {
+      return {
+        path: `/records/${this.recordId}/pages-gallery`,
+        query: this.recordsQuery,
+      }
+    },
+    recordPagesRoute() {
+      return {
+        path: `/records/${this.recordId}/pages`,
+        query: this.recordsQuery,
+      }
     },
     canEditRecord() {
       return this.authStore.hasRole('admin') || this.authStore.hasRole('user_bibl')
@@ -916,7 +947,7 @@ export default defineComponent({
         }
 
         // Redirect to record list after successful save
-        this.$router.push('/records')
+        this.$router.push(this.recordListRoute)
       } catch (err) {
         this.error = err.message || this.$t('records.saveError')
         console.error('Error saving record:', err)

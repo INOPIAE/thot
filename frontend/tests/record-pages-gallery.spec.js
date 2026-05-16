@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { RouterLinkStub, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import RecordPagesGallery from '@/views/records/RecordPagesGallery.vue'
@@ -98,10 +98,17 @@ function mountGallery() {
     global: {
       plugins: [i18n, pinia],
       mocks: {
-        $route: { params: { recordId: 'rec-1' } },
+        $route: {
+          params: { recordId: 'rec-1' },
+          query: {
+            recordsPage: '2',
+            recordsPageSize: '20',
+            recordsTitle: 'alpha',
+          },
+        },
       },
       stubs: {
-        RouterLink: { template: '<a><slot /></a>' },
+        RouterLink: RouterLinkStub,
         PdfJsPageViewer: { template: '<div class="pdf-viewer-stub" />' },
       },
     },
@@ -118,6 +125,16 @@ describe('RecordPagesGallery', () => {
   it('prefers the restriction PDF in gallery thumbnails, viewer, and download', async () => {
     const wrapper = mountGallery()
     await flushPromises()
+
+    const links = wrapper.findAllComponents(RouterLinkStub)
+    expect(links[0].props('to')).toEqual({
+      path: '/records',
+      query: {
+        recordsPage: '2',
+        recordsPageSize: '20',
+        recordsTitle: 'alpha',
+      },
+    })
 
     expect(pageService.getThumbnail).toHaveBeenCalledWith('p-1', 200, true)
     expect(pageService.getRestrictionViewPdf).toHaveBeenCalledWith('p-1')

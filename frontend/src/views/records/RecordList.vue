@@ -3,7 +3,7 @@
     <div class="records-header">
       <h1>{{ $t('nav.records') }}</h1>
       <div class="header-actions">
-        <router-link v-if="!defaultListMode && canCreateRecord" to="/records/new" class="btn btn-primary">
+        <router-link v-if="!defaultListMode && canCreateRecord" :to="buildRecordRoute('/records/new')" class="btn btn-primary">
           {{ $t('records.createNew') }}
         </router-link>
       </div>
@@ -166,14 +166,14 @@
             <td class="actions-cell">
               <router-link
                 v-if="record.page_count > 0"
-                :to="`/records/${record.id}/pages-gallery`"
+                :to="buildRecordRoute(`/records/${record.id}/pages-gallery`)"
                 class="btn btn-sm btn-secondary"
               >
                 {{ $t('pages.title') }}
               </router-link>
               <router-link
                 v-if="!defaultListMode"
-                :to="`/records/${record.id}`"
+                :to="buildRecordRoute(`/records/${record.id}`)"
                 class="btn btn-sm btn-info"
               >
                 {{ canEditRecord ? $t('common.edit') : $t('common.view') }}
@@ -223,6 +223,7 @@
 
 <script>
 import { defineComponent, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { fetchRecords } from '@/services/records'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -238,9 +239,10 @@ export default defineComponent({
   setup() {
     const authStore = useAuthStore()
     const appStore = useAppStore()
+    const route = useRoute()
     // Use a computed property to always get the latest config value
     const persCountLink = computed(() => appStore.getConfig('recordsPersCountLink', '#'))
-    return { authStore, persCountLink }
+    return { authStore, persCountLink, route }
   },
   data() {
     return {
@@ -258,6 +260,19 @@ export default defineComponent({
     }
   },
   computed: {
+    recordListQuery() {
+      const query = {
+        recordsPage: String(this.currentPage),
+        recordsPageSize: String(this.pageSize),
+      }
+
+      if (this.searchTitle) query.recordsTitle = this.searchTitle
+      if (this.searchSignature) query.recordsSignature = this.searchSignature
+      if (this.searchKeywordsNames) query.recordsKeywordsNames = this.searchKeywordsNames
+      if (this.searchKeywordsLocations) query.recordsKeywordsLocations = this.searchKeywordsLocations
+
+      return query
+    },
     totalPages() {
       return Math.ceil(this.totalRecords / this.pageSize)
     },
@@ -275,9 +290,28 @@ export default defineComponent({
     },
   },
   mounted() {
+    this.applyRouteQuery()
     this.loadRecords()
   },
   methods: {
+    buildRecordRoute(path) {
+      return {
+        path,
+        query: this.recordListQuery,
+      }
+    },
+    applyRouteQuery() {
+      const query = this.route?.query || {}
+      const page = Number.parseInt(query.recordsPage, 10)
+      const pageSize = Number.parseInt(query.recordsPageSize, 10)
+
+      this.currentPage = Number.isFinite(page) && page >= 0 ? page : 0
+      this.pageSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 10
+      this.searchTitle = typeof query.recordsTitle === 'string' ? query.recordsTitle : ''
+      this.searchSignature = typeof query.recordsSignature === 'string' ? query.recordsSignature : ''
+      this.searchKeywordsNames = typeof query.recordsKeywordsNames === 'string' ? query.recordsKeywordsNames : ''
+      this.searchKeywordsLocations = typeof query.recordsKeywordsLocations === 'string' ? query.recordsKeywordsLocations : ''
+    },
     getPagesUrl(recordId) {
       // Users with management roles go to pages list, others to gallery
       if (this.canManagePages) {

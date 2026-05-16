@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="gallery-header">
       <div class="header-title">
-        <router-link :to="`/records`" class="btn btn-light">
+        <router-link :to="recordListRoute" class="btn btn-light">
           {{ $t('common.back') }}
         </router-link>
         <button
@@ -40,7 +40,7 @@
         >
           {{ showThumbnails ? '◄ ' : '► ' }}{{ $t('pages.allPages') }}
         </button>
-        <router-link v-if="canManagePages" :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
+        <router-link v-if="canManagePages" :to="newPageRoute" class="btn btn-primary">
           {{ $t('pages.createNew') }}
         </router-link>
       </div>
@@ -62,7 +62,7 @@
       <div v-show="showThumbnails" class="thumbnails-panel">
         <div v-if="pages.length === 0" class="empty-state">
           <p>{{ $t('pages.noPages') }}</p>
-          <router-link v-if="canManagePages" :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
+          <router-link v-if="canManagePages" :to="newPageRoute" class="btn btn-primary">
             {{ $t('pages.createNew') }}
           </router-link>
         </div>
@@ -165,6 +165,31 @@ export default {
   computed: {
     recordId() {
       return this.$route.params.recordId
+    },
+    recordsQuery() {
+      const query = {}
+      const routeQuery = this.$route.query || {}
+
+      if (typeof routeQuery.recordsPage === 'string' && routeQuery.recordsPage) query.recordsPage = routeQuery.recordsPage
+      if (typeof routeQuery.recordsPageSize === 'string' && routeQuery.recordsPageSize) query.recordsPageSize = routeQuery.recordsPageSize
+      if (typeof routeQuery.recordsTitle === 'string' && routeQuery.recordsTitle) query.recordsTitle = routeQuery.recordsTitle
+      if (typeof routeQuery.recordsSignature === 'string' && routeQuery.recordsSignature) query.recordsSignature = routeQuery.recordsSignature
+      if (typeof routeQuery.recordsKeywordsNames === 'string' && routeQuery.recordsKeywordsNames) query.recordsKeywordsNames = routeQuery.recordsKeywordsNames
+      if (typeof routeQuery.recordsKeywordsLocations === 'string' && routeQuery.recordsKeywordsLocations) query.recordsKeywordsLocations = routeQuery.recordsKeywordsLocations
+
+      return query
+    },
+    recordListRoute() {
+      return {
+        path: '/records',
+        query: this.recordsQuery,
+      }
+    },
+    newPageRoute() {
+      return {
+        path: `/records/${this.recordId}/pages/new`,
+        query: this.recordsQuery,
+      }
     },
     showCitationLink() {
       return !!(this.selectedPage && this.selectedPage.pdf_public_url && !this.selectedPage.restriction_file)
