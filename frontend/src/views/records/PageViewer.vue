@@ -5,7 +5,7 @@
       <div class="header-actions">
         <router-link
           v-if="canEditPage || canManageFile"
-          :to="`/records/${recordId}/pages/${pageId}/edit`"
+          :to="pageEditRoute"
           class="btn btn-primary"
         >
           {{ canEditPage ? $t('common.edit') : $t('pages.uploadFile') }}
@@ -221,6 +221,30 @@ export default {
     pageId() {
       return this.$route.params.pageId
     },
+    pageListQuery() {
+      const query = {}
+      const routeQuery = this.$route.query || {}
+
+      if (typeof routeQuery.page === 'string' && routeQuery.page) {
+        query.page = routeQuery.page
+      }
+
+      if (typeof routeQuery.pageSize === 'string' && routeQuery.pageSize) {
+        query.pageSize = routeQuery.pageSize
+      }
+
+      if (typeof routeQuery.search === 'string' && routeQuery.search) {
+        query.search = routeQuery.search
+      }
+
+      return query
+    },
+    pageEditRoute() {
+      return {
+        path: `/records/${this.recordId}/pages/${this.pageId}/edit`,
+        query: this.pageListQuery,
+      }
+    },
     pdfThumbnailUrl() {
       return this.thumbnailBlobUrl
     },
@@ -247,7 +271,10 @@ export default {
     },
     backToListUrl() {
       if (this.canManagePages) {
-        return `/records/${this.recordId}/pages`
+        return {
+          path: `/records/${this.recordId}/pages`,
+          query: this.pageListQuery,
+        }
       }
       return `/records/${this.recordId}/pages-gallery`
     },

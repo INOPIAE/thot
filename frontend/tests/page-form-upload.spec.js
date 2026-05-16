@@ -148,6 +148,11 @@ function mountPageForm({ isEditMode = false, roles = ['admin'] } = {}) {
   const routeParams = isEditMode
     ? { recordId: 'rec-1', pageId: 'p-1' }
     : { recordId: 'rec-1' }
+  const routeQuery = {
+    page: '3',
+    pageSize: '25',
+    search: 'alpha',
+  }
 
   const routerPush = vi.fn()
 
@@ -155,7 +160,7 @@ function mountPageForm({ isEditMode = false, roles = ['admin'] } = {}) {
     global: {
       plugins: [i18n, pinia],
       mocks: {
-        $route: { params: routeParams },
+        $route: { params: routeParams, query: routeQuery },
         $router: { push: routerPush },
       },
       stubs: {
@@ -418,7 +423,14 @@ describe('PageForm – edit navigation and unsaved changes', () => {
 
     await wrapper.vm.navigateToAdjacentPage(1)
 
-    expect(routerPush).toHaveBeenCalledWith('/records/rec-1/pages/p-2/edit')
+    expect(routerPush).toHaveBeenCalledWith({
+      path: '/records/rec-1/pages/p-2/edit',
+      query: {
+        page: '3',
+        pageSize: '25',
+        search: 'alpha',
+      },
+    })
     expect(wrapper.vm.showUnsavedChangesDialog).toBe(false)
   })
 
@@ -453,7 +465,14 @@ describe('PageForm – edit navigation and unsaved changes', () => {
 
     expect(routerPush).not.toHaveBeenCalled()
     expect(wrapper.vm.showUnsavedChangesDialog).toBe(true)
-    expect(wrapper.vm.pendingNavigationTarget).toBe('/records/rec-1/pages/p-2/edit')
+    expect(wrapper.vm.pendingNavigationTarget).toEqual({
+      path: '/records/rec-1/pages/p-2/edit',
+      query: {
+        page: '3',
+        pageSize: '25',
+        search: 'alpha',
+      },
+    })
     expect(wrapper.text()).toContain('There are unsaved changes on this page. Do you want to save them before leaving edit mode?')
   })
 
@@ -472,7 +491,14 @@ describe('PageForm – edit navigation and unsaved changes', () => {
         name: 'Changed Page Name',
       }),
     )
-    expect(routerPush).toHaveBeenCalledWith('/records/rec-1/pages/p-2/edit')
+    expect(routerPush).toHaveBeenCalledWith({
+      path: '/records/rec-1/pages/p-2/edit',
+      query: {
+        page: '3',
+        pageSize: '25',
+        search: 'alpha',
+      },
+    })
     expect(wrapper.vm.showUnsavedChangesDialog).toBe(false)
   })
 
@@ -486,7 +512,28 @@ describe('PageForm – edit navigation and unsaved changes', () => {
     await flushPromises()
 
     expect(pageService.updatePage).not.toHaveBeenCalled()
-    expect(routerPush).toHaveBeenCalledWith('/records/rec-1/pages/p-2/edit')
+    expect(routerPush).toHaveBeenCalledWith({
+      path: '/records/rec-1/pages/p-2/edit',
+      query: {
+        page: '3',
+        pageSize: '25',
+        search: 'alpha',
+      },
+    })
     expect(wrapper.vm.showUnsavedChangesDialog).toBe(false)
+  })
+
+  it('builds the close target from the incoming page list query', async () => {
+    const { wrapper } = mountPageForm({ isEditMode: true })
+    await flushPromises()
+
+    expect(wrapper.vm.pageListRoute).toEqual({
+      path: '/records/rec-1/pages',
+      query: {
+        page: '3',
+        pageSize: '25',
+        search: 'alpha',
+      },
+    })
   })
 })

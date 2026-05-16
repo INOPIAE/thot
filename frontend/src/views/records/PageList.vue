@@ -11,7 +11,7 @@
         <router-link :to="`/records/${recordId}/pages-gallery`" class="btn btn-info">
           {{ $t('pages.galleryTitle') }}
         </router-link>
-        <router-link v-if="canCreatePage" :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
+        <router-link v-if="canCreatePage" :to="buildPageFormRoute(`/records/${recordId}/pages/new`)" class="btn btn-primary">
           {{ $t('pages.createNew') }}
         </router-link>
       </div>
@@ -169,13 +169,13 @@
               {{ $t('pages.createdOn') }}: {{ formatDate(page.created_on) }}
             </small>
             <div class="page-actions">
-              <router-link :to="`/records/${recordId}/pages/${page.id}`" class="btn btn-sm btn-info">
+              <router-link :to="buildPageFormRoute(`/records/${recordId}/pages/${page.id}`)" class="btn btn-sm btn-info">
                 {{ $t('pages.openOverview') }}
               </router-link>
-              <router-link :to="`/records/${recordId}/pages/${page.id}/viewer`" class="btn btn-sm btn-primary">
+              <router-link :to="buildPageFormRoute(`/records/${recordId}/pages/${page.id}/viewer`)" class="btn btn-sm btn-primary">
                 {{ $t('pages.openPdfViewer') }}
               </router-link>
-              <router-link v-if="canEditPage || canUploadExistingPage" :to="`/records/${recordId}/pages/${page.id}/edit`" class="btn btn-sm btn-secondary">
+              <router-link v-if="canEditPage || canUploadExistingPage" :to="buildPageFormRoute(`/records/${recordId}/pages/${page.id}/edit`)" class="btn btn-sm btn-secondary">
                 {{ canEditPage ? $t('common.edit') : $t('pages.uploadFile') }}
               </router-link>
               <button v-if="canEditPage" class="btn btn-sm btn-danger" @click="handleDelete(page.id)">
@@ -211,7 +211,7 @@
     <!-- Empty State -->
     <div v-if="!loading && pages.length === 0" class="empty-state">
       <p>{{ $t('pages.noPages') }}</p>
-      <router-link v-if="canCreatePage" :to="`/records/${recordId}/pages/new`" class="btn btn-primary">
+      <router-link v-if="canCreatePage" :to="buildPageFormRoute(`/records/${recordId}/pages/new`)" class="btn btn-primary">
         {{ $t('pages.createNew') }}
       </router-link>
     </div>
@@ -251,6 +251,18 @@ export default {
     }
   },
   computed: {
+    pageListQuery() {
+      const query = {
+        page: String(this.currentPage),
+        pageSize: String(this.pageSize),
+      }
+
+      if (this.searchName) {
+        query.search = this.searchName
+      }
+
+      return query
+    },
     totalPages() {
       return Math.ceil(this.total / this.pageSize)
     },
@@ -273,6 +285,20 @@ export default {
     },
   },
   methods: {
+    buildPageFormRoute(path) {
+      return {
+        path,
+        query: this.pageListQuery,
+      }
+    },
+    applyRouteQuery() {
+      const page = Number.parseInt(this.route.query?.page, 10)
+      const pageSize = Number.parseInt(this.route.query?.pageSize, 10)
+
+      this.currentPage = Number.isFinite(page) && page > 0 ? page : 1
+      this.pageSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : 10
+      this.searchName = typeof this.route.query?.search === 'string' ? this.route.query.search : ''
+    },
     canManageOcr() {
       // Admins und user_scan dürfen OCR starten
       return this.authStore.hasRole('admin') || this.authStore.hasRole('user_scan')
@@ -496,6 +522,7 @@ export default {
   },
   mounted() {
     this.recordId = this.route.params.recordId
+    this.applyRouteQuery()
     this.loadRecordTitle()
     this.loadPages()
   },

@@ -1,4 +1,4 @@
-import { mount, flushPromises } from '@vue/test-utils'
+import { RouterLinkStub, mount, flushPromises } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PageList from '@/views/records/PageList.vue'
 
@@ -6,6 +6,7 @@ const mockRoute = {
   params: {
     recordId: 'record-1',
   },
+  query: {},
 }
 
 const mockAuthStore = {
@@ -67,13 +68,13 @@ function translate(key, params = {}) {
   return key
 }
 
-async function mountPageList(roles, pages) {
+async function mountPageList(roles, pages, total = pages.length) {
   mockAuthStore.hasRole.mockImplementation((role) => roles.includes(role))
   recordService.getRecord.mockResolvedValue({ title: 'Record Title' })
   pageService.updatePage.mockResolvedValue({})
   pageService.listPages.mockImplementation(async () => ({
     items: pages.map((page) => ({ ...page })),
-    total: pages.length,
+    total,
   }))
 
   const wrapper = mount(PageList, {
@@ -83,9 +84,7 @@ async function mountPageList(roles, pages) {
         $i18n: { locale: 'de' },
       },
       stubs: {
-        RouterLink: {
-          template: '<a><slot /></a>',
-        },
+        RouterLink: RouterLinkStub,
       },
     },
   })
@@ -99,6 +98,7 @@ async function mountPageList(roles, pages) {
 describe('PageList.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRoute.query = {}
   })
 
   it('renders one grouped reorder block per page for user_page', async () => {
@@ -164,5 +164,53 @@ describe('PageList.vue', () => {
     expect(pageService.updatePage).not.toHaveBeenCalled()
     expect(wrapper.vm.error).toBe('Please enter a position between 1 and 2.')
     expect(wrapper.text()).toContain('Please enter a position between 1 and 2.')
+  })
+
+  it('restores pagination from the route query and forwards it to page routes', async () => {
+    mockRoute.query = {
+      page: '4',
+      pageSize: '25',
+      search: 'alpha',
+    }
+
+    const wrapper = await mountPageList(['admin'], [createPage('page-1', 1)], 100)
+
+    expect(wrapper.vm.currentPage).toBe(4)
+    expect(wrapper.vm.pageSize).toBe(25)
+    expect(wrapper.vm.searchName).toBe('alpha')
+
+    const detailLink = wrapper.findAllComponents(RouterLinkStub).find((link) => {
+      const to = link.props('to')
+      return to?.path === '/records/record-1/pages/page-1'
+    })
+    const viewerLink = wrapper.findAllComponents(RouterLinkStub).find((link) => {
+      const to = link.props('to')
+      return to?.path === '/records/record-1/pages/page-1/viewer'
+    })
+    const editLink = wrapper.findAllComponents(RouterLinkStub).find((link) => {
+      const to = link.props('to')
+      return to?.path === '/records/record-1/pages/page-1/edit'
+    })
+
+    const expectedRoute = {
+      query: {
+        page: '4',
+        pageSize: '25',
+        search: 'alpha',
+      },
+    }
+
+    expect(detailLink.props('to')).toEqual({
+      path: '/records/record-1/pages/page-1',
+      ...expectedRoute,
+    })
+    expect(viewerLink.props('to')).toEqual({
+      path: '/records/record-1/pages/page-1/viewer',
+      ...expectedRoute,
+    })
+    expect(editLink.props('to')).toEqual({
+      path: '/records/record-1/pages/page-1/edit',
+      ...expectedRoute,
+    })
   })
 })

@@ -1,0 +1,141 @@
+{
+  "numTotalTestSuites": 6,
+  "numPassedTestSuites": 6,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 9,
+  "numPassedTests": 9,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "startTime": 1778908952711,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "PageDetail.vue"
+          ],
+          "fullName": " PageDetail.vue preserves the incoming page list query in viewer, edit, and back routes",
+          "status": "passed",
+          "title": "preserves the incoming page list query in viewer, edit, and back routes",
+          "duration": 214,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1778908971577,
+      "endTime": 1778908971791,
+      "status": "passed",
+      "message": "",
+      "name": "D:/Daten/programierung neu/nlf/db/frontend/tests/page-detail.spec.js"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "PageList.vue"
+          ],
+          "fullName": " PageList.vue renders one grouped reorder block per page for user_page",
+          "status": "passed",
+          "title": "renders one grouped reorder block per page for user_page",
+          "duration": 360,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "PageList.vue"
+          ],
+          "fullName": " PageList.vue does not render the reorder block for user_scan only",
+          "status": "passed",
+          "title": "does not render the reorder block for user_scan only",
+          "duration": 63,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "PageList.vue"
+          ],
+          "fullName": " PageList.vue updates affected pages when moving a page to a target position",
+          "status": "passed",
+          "title": "updates affected pages when moving a page to a target position",
+          "duration": 293,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "PageList.vue"
+          ],
+          "fullName": " PageList.vue shows an error and does not update pages for an invalid target position",
+          "status": "passed",
+          "title": "shows an error and does not update pages for an invalid target position",
+          "duration": 245,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "PageList.vue"
+          ],
+          "fullName": " PageList.vue restores pagination from the route query and forwards it to page routes",
+          "status": "passed",
+          "title": "restores pagination from the route query and forwards it to page routes",
+          "duration": 78,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1778908971411,
+      "endTime": 1778908972451,
+      "status": "passed",
+      "message": "",
+      "name": "D:/Daten/programierung neu/nlf/db/frontend/tests/page-list.spec.js"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [
+            "",
+            "PageViewer.vue"
+          ],
+          "fullName": " PageViewer.vue zeigt Fallback wenn keine Datei vorhanden",
+          "status": "passed",
+          "title": "zeigt Fallback wenn keine Datei vorhanden",
+          "duration": 234,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "PageViewer.vue"
+          ],
+          "fullName": " PageViewer.vue rendert PdfJsPageViewer mit korrekten Props",
+          "status": "passed",
+          "title": "rendert PdfJsPageViewer mit korrekten Props",
+          "duration": 166,
+          "failureMessages": []
+        },
+        {
+          "ancestorTitles": [
+            "",
+            "PageViewer.vue"
+          ],
+          "fullName": " PageViewer.vue preserves the incoming page list query in back and edit routes",
+          "status": "passed",
+          "title": "preserves the incoming page list query in back and edit routes",
+          "duration": 53,
+          "failureMessages": []
+        }
+      ],
+      "startTime": 1778908972713,
+      "endTime": 1778908973172,
+      "status": "passed",
+      "message": "",
+      "name": "D:/Daten/programierung neu/nlf/db/frontend/tests/PageViewer.integration.spec.js"
+    }
+  ]
+}

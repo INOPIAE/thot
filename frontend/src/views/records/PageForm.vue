@@ -25,7 +25,7 @@
           </button>
         </div>
       </div>
-      <router-link :to="`/records/${recordId}/pages`" class="btn btn-secondary">
+      <router-link :to="pageListRoute" class="btn btn-secondary">
         {{ $t('common.back') }}
       </router-link>
     </div>
@@ -258,7 +258,7 @@
         <button type="submit" class="btn btn-primary" :disabled="submitting">
           {{ submitting ? $t('common.saving') : $t('common.save') }}
         </button>
-        <router-link :to="`/records/${recordId}/pages`" class="btn btn-secondary">
+        <router-link :to="pageListRoute" class="btn btn-secondary">
           {{ $t('common.cancel') }}
         </router-link>
       </div>
@@ -393,6 +393,27 @@ export default {
     },
     pageId() {
       return this.$route.params.pageId
+    },
+    pageListRoute() {
+      const query = {}
+      const routeQuery = this.$route.query || {}
+
+      if (typeof routeQuery.page === 'string' && routeQuery.page) {
+        query.page = routeQuery.page
+      }
+
+      if (typeof routeQuery.pageSize === 'string' && routeQuery.pageSize) {
+        query.pageSize = routeQuery.pageSize
+      }
+
+      if (typeof routeQuery.search === 'string' && routeQuery.search) {
+        query.search = routeQuery.search
+      }
+
+      return {
+        path: `/records/${this.recordId}/pages`,
+        query,
+      }
     },
     currentPageIndex() {
       return this.pageSequence.findIndex((page) => page.id === this.pageId)
@@ -708,7 +729,10 @@ export default {
         return
       }
 
-      const targetPath = `/records/${this.recordId}/pages/${targetPage.id}/edit`
+      const targetPath = {
+        path: `/records/${this.recordId}/pages/${targetPage.id}/edit`,
+        query: { ...(this.$route.query || {}) },
+      }
       if (this.shouldBlockNavigation(targetPath)) {
         this.openUnsavedChangesDialog(targetPath)
         return
@@ -893,7 +917,7 @@ export default {
         }
 
         this.captureInitialFormSnapshot()
-        const redirectTarget = options.redirectTo || `/records/${this.recordId}/pages`
+        const redirectTarget = options.redirectTo || this.pageListRoute
         await this.$router.push(redirectTarget)
       } catch (err) {
         this.error = err.message || this.$t('pages.saveError')
