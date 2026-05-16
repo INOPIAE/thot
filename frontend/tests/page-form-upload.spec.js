@@ -422,6 +422,28 @@ describe('PageForm – edit navigation and unsaved changes', () => {
     expect(wrapper.vm.showUnsavedChangesDialog).toBe(false)
   })
 
+  it('stays on the edit page and reloads data on a normal save', async () => {
+    const { wrapper, routerPush } = mountPageForm({ isEditMode: true })
+    await flushPromises()
+
+    const getPageCallsBeforeSave = pageService.getPage.mock.calls.length
+    const listPagesCallsBeforeSave = pageService.listPages.mock.calls.length
+
+    await wrapper.find('#name').setValue('Changed Page Name')
+    await wrapper.find('form.page-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(pageService.updatePage).toHaveBeenCalledWith(
+      'p-1',
+      expect.objectContaining({
+        name: 'Changed Page Name',
+      }),
+    )
+    expect(pageService.getPage.mock.calls.length).toBeGreaterThan(getPageCallsBeforeSave)
+    expect(pageService.listPages.mock.calls.length).toBeGreaterThan(listPagesCallsBeforeSave)
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
   it('prompts for save or discard before switching pages when the form is dirty', async () => {
     const { wrapper, routerPush } = mountPageForm({ isEditMode: true })
     await flushPromises()

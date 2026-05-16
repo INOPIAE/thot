@@ -883,11 +883,17 @@ export default {
         this.resetSelectedRestrictionFileState()
         this.form.delete_file = false
         this.form.delete_restriction_file = false
-        this.captureInitialFormSnapshot()
-
-        const redirectTarget = options.redirectTo || `/records/${this.recordId}/pages`
         this.showUnsavedChangesDialog = false
         this.pendingNavigationTarget = null
+
+        if (this.isEditMode && !options.redirectTo) {
+          await Promise.all([this.loadPageSequence(), this.loadPage()])
+          this.captureInitialFormSnapshot()
+          return
+        }
+
+        this.captureInitialFormSnapshot()
+        const redirectTarget = options.redirectTo || `/records/${this.recordId}/pages`
         await this.$router.push(redirectTarget)
       } catch (err) {
         this.error = err.message || this.$t('pages.saveError')
