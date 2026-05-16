@@ -46,7 +46,14 @@ class PageOcrJobService:
         )
 
     @classmethod
-    def schedule_page_ocr(cls, page_id: str, record_id: Optional[str] = None) -> bool:
+    def schedule_page_ocr(
+        cls,
+        page_id: str,
+        record_id: Optional[str] = None,
+        preserve_comment: bool = False,
+        preserved_comment: Optional[str] = None,
+        previous_current_file: Optional[str] = None,
+    ) -> bool:
         """Schedule OCR for a page. Returns True when completed inline."""
         import_id = str(uuid.uuid4())
         if cls.should_process_inline():
@@ -55,6 +62,9 @@ class PageOcrJobService:
                 record_id=record_id,
                 import_id=import_id,
                 raise_on_error=True,
+                preserve_comment=preserve_comment,
+                preserved_comment=preserved_comment,
+                previous_current_file=previous_current_file,
             )
             return True
 
@@ -70,6 +80,9 @@ class PageOcrJobService:
             record_id,
             import_id,
             False,
+            preserve_comment,
+            preserved_comment,
+            previous_current_file,
         )
         return False
 
@@ -87,6 +100,9 @@ class PageOcrJobService:
         record_id: Optional[str],
         import_id: str,
         raise_on_error: bool = False,
+        preserve_comment: bool = False,
+        preserved_comment: Optional[str] = None,
+        previous_current_file: Optional[str] = None,
     ) -> None:
         db = SessionLocal()
         t0 = time.monotonic()
@@ -125,9 +141,20 @@ class PageOcrJobService:
             )
             page.current_file = ocr_result.current_file_relative_path
 
+            if (
+                previous_current_file
+                and page.current_file
+                and previous_current_file != page.current_file
+            ):
+                previous_current_path = (config.UPLOAD_DIRECTORY / previous_current_file).resolve()
+                if previous_current_path.exists() and previous_current_path.is_file():
+                    previous_current_path.unlink()
+
             from app.routes.pages import _update_page_comment_with_detected_page_number
 
             _update_page_comment_with_detected_page_number(page)
+            if preserve_comment:
+                page.comment = preserved_comment
             page.last_modified_on = datetime.now(timezone.utc)
             db.commit()
             logger.info(

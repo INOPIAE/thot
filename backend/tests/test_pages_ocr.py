@@ -9,6 +9,7 @@ from app.utils import create_access_token, hash_password
 from config import config
 
 from io import BytesIO
+from types import SimpleNamespace
 from pypdf import PdfWriter
 
 def _create_user_with_role(db, username: str, role_name: str) -> User:
@@ -132,3 +133,49 @@ def test_start_ocr_job_no_origin_file(client, db, tmp_path):
     response = client.post(f"/api/v1/pages/{page.id}/start-ocr", headers=headers)
     assert response.status_code == 400
     assert "No origin file" in response.json()["detail"]
+
+
+def test_schedule_page_ocr_async_preserves_existing_comment(db, monkeypatch):
+    user = _create_user_with_role(db, "ocr_async_preserve", "admin")
+    record, restriction, workstatus, page = _create_record_and_page(db, user.id)
+    page.comment = "Bestehender Kommentar"
+    db.commit()
+
+    class SessionProxy:
+        def __getattr__(self, name):
+            return getattr(db, name)
+
+        def close(self):
+            return None
+
+    class ImmediateExecutor:
+        def submit(self, func, *args):
+            func(*args)
+            return SimpleNamespace()
+
+    monkeypatch.setattr(PageOcrJobService, "should_process_inline", classmethod(lambda cls: False))
+    monkeypatch.setattr(PageOcrJobService, "_ensure_executor", classmethod(lambda cls: ImmediateExecutor()))
+    monkeypatch.setattr("app.services.page_ocr_job_service.SessionLocal", lambda: SessionProxy())
+    monkeypatch.setattr(
+        "app.services.page_ocr_job_service.PdfOcrService.process_origin_to_current",
+        lambda *args, **kwargs: SimpleNamespace(current_file_relative_path="OCRTestSignature/current/test_current.pdf"),
+    )
+    monkeypatch.setattr(
+        "app.routes.pages._update_page_comment_with_detected_page_number",
+        lambda page_obj: setattr(page_obj, "comment", "Seite: 77"),
+    )
+
+    completed_inline = PageOcrJobService.schedule_page_ocr(
+        str(page.id),
+        str(record.id),
+        preserve_comment=True,
+        preserved_comment="Bestehender Kommentar",
+    )
+
+    assert completed_inline is False
+
+    db.expire_all()
+    updated_page = db.query(Page).filter(Page.id == page.id).first()
+    assert updated_page is not None
+    assert updated_page.current_file == "OCRTestSignature/current/test_current.pdf"
+    assert updated_page.comment == "Bestehender Kommentar"

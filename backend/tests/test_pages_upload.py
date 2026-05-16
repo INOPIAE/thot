@@ -1,6 +1,7 @@
 """Tests for page PDF upload handling."""
 
 from io import BytesIO
+from datetime import datetime as real_datetime
 from pathlib import Path
 import uuid
 
@@ -22,7 +23,13 @@ PAGE_NUMBER_SAMPLES_DIR = Path(__file__).parent / "fixtures" / "page_number_samp
 
 @pytest.fixture(autouse=True)
 def inline_ocr_processing(monkeypatch, db):
-    def _run_ocr_inline(page_id: str, record_id: str | None = None) -> bool:
+    def _run_ocr_inline(
+        page_id: str,
+        record_id: str | None = None,
+        preserve_comment: bool = False,
+        preserved_comment: str | None = None,
+        previous_current_file: str | None = None,
+    ) -> bool:
         page = db.query(Page).filter(Page.id == uuid.UUID(str(page_id))).first()
         assert page is not None
 
@@ -33,7 +40,13 @@ def inline_ocr_processing(monkeypatch, db):
             record_id=record_id,
         )
         page.current_file = ocr_result.current_file_relative_path
+        if previous_current_file and page.current_file and previous_current_file != page.current_file:
+            previous_current_path = (config.UPLOAD_DIRECTORY / previous_current_file).resolve()
+            if previous_current_path.exists() and previous_current_path.is_file():
+                previous_current_path.unlink()
         pages_routes._update_page_comment_with_detected_page_number(page)
+        if preserve_comment:
+            page.comment = preserved_comment
         db.commit()
         return True
 
@@ -167,6 +180,70 @@ def test_create_page_returns_pending_ocr_status_when_processing_is_backgrounded(
     assert payload["current_file"] is None
     assert payload["ocr_status"] == "pending"
     assert payload["location_file"].startswith("Async_Signature/origin/")
+
+
+def test_update_page_returns_pending_ocr_status_when_processing_is_backgrounded(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ASYNC", True)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", True)
+    monkeypatch.setattr(config, "OCR_PIPELINE_REQUIRED", False)
+    monkeypatch.setattr(
+        PageOcrJobService,
+        "schedule_page_ocr",
+        lambda page_id, record_id=None, preserve_comment=False, preserved_comment=None, previous_current_file=None: False,
+    )
+
+    user = _create_user_with_role(db, "page_async_update_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Async Update Signature")
+    headers, cookies = _auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+
+    create_response = client.post(
+        "/api/v1/pages",
+        headers=headers,
+        data={
+            "name": "Async Update Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("create.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert create_response.status_code == 200
+    page_id = create_response.json()["id"]
+
+    persisted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
+    assert persisted_page is not None
+    persisted_page.current_file = "Async_Update_Signature/current/existing_current.pdf"
+    db.commit()
+
+    update_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=headers,
+        data={
+            "name": "Async Update Page",
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("update.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["current_file"] is None
+    assert payload["ocr_status"] == "pending"
+
+    db.expire_all()
+    updated_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
+    assert updated_page is not None
+    assert updated_page.current_file is None
 
 
 def test_create_page_splits_multi_page_pdf_into_multiple_pages(client, db, tmp_path, monkeypatch):
@@ -742,6 +819,13 @@ def test_e2e_current_file_is_set_on_create_and_update(client, db, tmp_path, monk
     assert create_origin_path.exists()
     assert create_current_path.exists()
 
+    class _UpdateDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return real_datetime(2099, 1, 2, 3, 4, 5, tzinfo=tz)
+
+    monkeypatch.setattr(pages_routes, "datetime", _UpdateDateTime)
+
     update_response = client.put(
         f"/api/v1/pages/{page_id}",
         headers=headers,
@@ -765,10 +849,64 @@ def test_e2e_current_file_is_set_on_create_and_update(client, db, tmp_path, monk
     update_current_path = tmp_path / updated_payload["current_file"]
     assert update_origin_path.exists()
     assert update_current_path.exists()
+    assert not create_current_path.exists()
 
     persisted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
     assert persisted_page is not None
     assert persisted_page.current_file == updated_payload["current_file"]
+
+
+def test_update_page_replaces_current_file_but_preserves_comment(client, db, tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "UPLOAD_DIRECTORY", tmp_path)
+    monkeypatch.setattr(config, "OCR_PIPELINE_ENABLED", False)
+    monkeypatch.setattr(pages_routes, "_extract_page_number_from_pdf_text", lambda _: 42)
+
+    user = _create_user_with_role(db, "page_comment_preserve_user", "admin")
+    record, restriction, workstatus = _create_record_fixture(db, user.id, signature="Preserve Comment Signature")
+    headers, cookies = _auth_headers_and_csrf(user)
+    client.cookies.clear()
+    for k, v in cookies.items():
+        client.cookies.set(k, v)
+
+    create_response = client.post(
+        "/api/v1/pages",
+        headers=headers,
+        data={
+            "name": "Preserve Comment Page",
+            "record_id": str(record.id),
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("create.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert create_response.status_code == 200
+    page_id = create_response.json()["id"]
+
+    update_response = client.put(
+        f"/api/v1/pages/{page_id}",
+        headers=headers,
+        data={
+            "name": "Preserve Comment Page Updated",
+            "comment": "Manueller Kommentar bleibt",
+            "restriction_id": str(restriction.id),
+            "workstatus_id": str(workstatus.id),
+        },
+        files={
+            "file": ("update.pdf", _build_pdf(1), "application/pdf"),
+        },
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["current_file"].startswith("Preserve_Comment_Signature/current/")
+    assert payload["comment"] == "Manueller Kommentar bleibt"
+
+    persisted_page = db.query(Page).filter(Page.id == uuid.UUID(page_id)).first()
+    assert persisted_page is not None
+    assert persisted_page.comment == "Manueller Kommentar bleibt"
 
 
 def test_create_page_sets_comment_with_detected_page_number(client, db, tmp_path, monkeypatch):

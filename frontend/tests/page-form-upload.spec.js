@@ -30,6 +30,7 @@ vi.mock('@/services/page', () => ({
       restriction_id: 'r1',
       workstatus_id: null,
       location_file: 'some/file.pdf',
+      ocr_status: 'completed',
     }),
     createPage: vi.fn().mockResolvedValue({}),
     updatePage: vi.fn().mockResolvedValue({}),
@@ -74,6 +75,7 @@ const messages = {
       uploadSinglePageOnly: 'Only single-page PDFs are allowed when replacing a file on an existing page.',
       restrictionUploadSinglePageOnly: 'Restriction files must always be uploaded as a single-page PDF.',
       uploadSinglePageError: 'The selected PDF has multiple pages. Please upload a single-page PDF.',
+      ocrPending: 'OCR processing is still running for this page.',
       restrictionRotation: 'Restriction rotation',
       previousPage: 'Previous page',
       nextPage: 'Next page',
@@ -309,6 +311,33 @@ describe('PageForm – file page count validation in edit mode', () => {
     expect(readSpy).not.toHaveBeenCalled()
     expect(wrapper.vm.filePageError).toBeNull()
     expect(wrapper.vm.selectedFile).toBeTruthy()
+  })
+})
+
+describe('PageForm – OCR status visibility', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    global.URL.createObjectURL = vi.fn(() => 'blob:thumbnail')
+    global.URL.revokeObjectURL = vi.fn()
+  })
+
+  it('shows a pending OCR warning in edit mode when the backend reports pending status', async () => {
+    pageService.getPage.mockResolvedValueOnce({
+      name: 'Pending OCR Page',
+      description: '',
+      page: '',
+      comment: '',
+      restriction_id: 'r1',
+      workstatus_id: null,
+      location_file: 'some/file.pdf',
+      current_file: null,
+      ocr_status: 'pending',
+    })
+
+    const { wrapper } = mountPageForm({ isEditMode: true })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('OCR processing is still running for this page.')
   })
 })
 

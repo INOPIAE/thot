@@ -33,6 +33,10 @@
     <div v-if="loading" class="loading">{{ $t('common.loading') }}</div>
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
 
+    <div v-if="isEditMode && isOcrPending" class="alert alert-warning ocr-pending-alert">
+      {{ $t('pages.ocrPending') }}
+    </div>
+
     <form v-if="!loading" class="page-form" @submit.prevent="handleSubmit">
 
       <div v-if="(isEditMode || (!isEditMode && (pageRecordTitle || pageRecordSignature)))" class="form-group">
@@ -361,6 +365,7 @@ export default {
       showUnsavedChangesDialog: false,
       pendingNavigationTarget: null,
       bypassUnsavedChangesGuard: false,
+      ocrStatus: 'not-applicable',
       form: {
         name: '',
         description: '',
@@ -415,6 +420,9 @@ export default {
     },
     isUploadOnlyMode() {
       return this.isEditMode && !this.canEditPage && this.canManageFile
+    },
+    isOcrPending() {
+      return this.ocrStatus === 'pending'
     },
     rotationStyle() {
       return this.form.rotation ? `transform: rotate(${this.form.rotation}deg);` : ''
@@ -514,6 +522,7 @@ export default {
       this.pageSequence = []
       this.resetSelectedFileState()
       this.resetSelectedRestrictionFileState()
+      this.ocrStatus = 'not-applicable'
       this.hasCurrentFile = false
       this.hasRestrictionFile = false
       this.revokePdfUrls()
@@ -616,6 +625,7 @@ export default {
         this.form.order_by = page.order_by !== undefined && page.order_by !== null ? page.order_by : null
         this.form.rotation = typeof page.rotation === 'number' ? page.rotation : 0
         this.form.rotation_restriction = typeof page.rotation_restriction === 'number' ? page.rotation_restriction : 0
+        this.ocrStatus = page.ocr_status || 'not-applicable'
         this.hasCurrentFile = !!(page.current_file || page.location_file)
         this.hasRestrictionFile = !!page.restriction_file
         this.pageRecordTitle = page.record_title || ''
@@ -925,6 +935,10 @@ export default {
   padding: 20px;
   max-width: 900px;
   margin: 0 auto;
+}
+
+.ocr-pending-alert {
+  margin-bottom: 1rem;
 }
 
 .form-header {

@@ -799,12 +799,21 @@ def _update_page_comment_with_detected_page_number(page: Page) -> None:
     page.comment = f"Seite: {detected_number}"
 
 
-def _populate_current_file_from_origin(db: Session, page: Page) -> None:
+def _populate_current_file_from_origin(
+    db: Session,
+    page: Page,
+    preserve_comment: bool = False,
+    preserved_comment: Optional[str] = None,
+    previous_current_file: Optional[str] = None,
+) -> None:
     """Run OCR inline or queue background OCR, then refresh page state."""
     try:
         completed_inline = PageOcrJobService.schedule_page_ocr(
             page_id=str(page.id),
             record_id=str(page.record_id) if page.record_id else None,
+            preserve_comment=preserve_comment,
+            preserved_comment=preserved_comment,
+            previous_current_file=previous_current_file,
         )
         db.refresh(page)
         if completed_inline:
@@ -1714,10 +1723,22 @@ async def update_page(
             storage_subdir="restriction",
         )
 
+    previous_current_file = None
+    if file and file.filename:
+        previous_current_file = existing_page.current_file
+        if config.OCR_PIPELINE_ENABLED and config.OCR_PIPELINE_ASYNC and not config.OCR_PIPELINE_REQUIRED:
+            existing_page.current_file = None
+
     db.commit()
     if file and file.filename:
         db.refresh(existing_page)
-        _populate_current_file_from_origin(db, existing_page)
+        _populate_current_file_from_origin(
+            db,
+            existing_page,
+            preserve_comment=True,
+            preserved_comment=existing_page.comment,
+            previous_current_file=previous_current_file,
+        )
     db.refresh(existing_page)
     
     return {
